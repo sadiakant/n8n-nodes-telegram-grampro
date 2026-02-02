@@ -10,8 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # Required for trusted publishing
-
+      id-token: write # Essential for OIDC
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,13 +21,20 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org/
 
+      # 1. Force update npm to ensure the latest OIDC logic is used
+      - name: Update npm
+        run: npm install -g npm@latest
+
       - name: Install dependencies
         run: npm ci
 
       - name: Build project
         run: npm run build
 
+      # 2. Publish using the environment's id-token
       - name: Publish to npm
         run: npm publish --provenance
-
-        
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} # Only if NOT using Trusted Publishing
+          # NOTE: If using ONLY Trusted Publishing, you don't need the secret above,
+          # but the '--provenance' flag requires the latest npm version.
