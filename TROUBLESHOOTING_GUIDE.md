@@ -45,6 +45,38 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 
 ---
 
+#### **"Session string generation failed" Error**
+**Problem**: Authentication completes but session string is not generated properly.
+
+**Causes:**
+- Invalid phone code hash
+- Expired verification code
+- 2FA password issues
+- Network interruptions during authentication
+
+**Solutions:**
+1. **Verify Phone Code Hash**
+   - Ensure you're using the correct phoneCodeHash from Request Code
+   - Don't reuse old phoneCodeHash values
+   - Use drag-and-drop to avoid manual copying errors
+
+2. **Check 2FA Password**
+   - If your account has 2FA enabled, ensure correct password
+   - Check for typos in 2FA password
+   - Reset 2FA if forgotten (requires email verification)
+
+3. **Complete Authentication Quickly**
+   - Verification codes expire in 10-15 minutes
+   - Complete both Request Code and Sign In operations back-to-back
+   - Request new code if previous one expired
+
+4. **Network Stability**
+   - Ensure stable internet connection during authentication
+   - Avoid VPN/proxy interference
+   - Check for firewall blocking connections
+
+---
+
 #### **"Invalid phone code" Error**
 **Problem**: Verification code entered is not accepted.
 
@@ -371,6 +403,116 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 
 ---
 
+### **New Operation Issues**
+
+#### **"Copy Message failed" Error**
+**Problem**: Message copying between chats fails.
+
+**Causes:**
+- Invalid source or target chat IDs
+- Source message doesn't exist
+- Insufficient permissions in target chat
+- Media file access issues
+
+**Solutions:**
+1. **Verify Chat IDs**
+   - Ensure both source and target chat IDs are valid
+   - Check if you're a member of both chats
+   - Verify chat permissions
+
+2. **Check Source Message**
+   - Ensure the message ID exists in the source chat
+   - Verify you have access to the source message
+   - Check if the message contains media
+
+3. **Target Chat Permissions**
+   - Ensure you have permission to send messages in target chat
+   - Check if the target chat allows message forwarding
+   - Verify you're not restricted in the target chat
+
+---
+
+#### **"Edit Message Media failed" Error**
+**Problem**: Editing message media content fails.
+
+**Causes:**
+- Invalid media file format
+- Missing or incorrect message ID
+- Insufficient permissions to edit the message
+- Original message doesn't contain media
+
+**Solutions:**
+1. **Verify Media File**
+   - Ensure media file exists and is accessible
+   - Check file format compatibility
+   - Verify file size limits
+
+2. **Check Message Details**
+   - Ensure message ID is correct
+   - Verify the message exists in the chat
+   - Confirm the message contains media
+
+3. **Permissions Check**
+   - Ensure you can edit messages in the chat
+   - Verify you're the message author (usually required)
+   - Check for chat restrictions on media editing
+
+---
+
+#### **"User Operation failed" Error**
+**Problem**: User-related operations (profile updates, username changes) fail.
+
+**Causes:**
+- Invalid user ID format
+- Insufficient permissions for profile changes
+- Username already taken
+- Account restrictions
+
+**Solutions:**
+1. **Verify User ID**
+   - Use correct username format (@username) or numeric ID
+   - Check if user exists and is accessible
+   - Ensure proper user identification
+
+2. **Profile Update Restrictions**
+   - Some profile fields may be restricted
+   - Username changes have specific requirements
+   - Check for account verification requirements
+
+3. **Username Availability**
+   - Ensure new username is not already taken
+   - Check username format requirements
+   - Verify username length limits
+
+---
+
+#### **"Channel Management failed" Error**
+**Problem**: Channel/group management operations fail.
+
+**Causes:**
+- Insufficient admin permissions
+- Invalid user IDs for member operations
+- Channel restrictions on member management
+- Ban duration or reason format issues
+
+**Solutions:**
+1. **Verify Admin Permissions**
+   - Ensure you have required admin rights
+   - Check specific permissions for each operation
+   - Verify you're not restricted from management actions
+
+2. **User ID Validation**
+   - Use correct username format (@username) or numeric ID
+   - Ensure target user exists in the channel/group
+   - Check if user is already banned or removed
+
+3. **Channel Restrictions**
+   - Some channels have member management restrictions
+   - Verify channel type (public vs private)
+   - Check for additional security settings
+
+---
+
 ## 🔧 Advanced Troubleshooting
 
 ### **Debug Mode Setup**
@@ -477,6 +619,10 @@ Monitor resource usage:
 - [ ] Valid chat/message IDs
 - [ ] File permissions correct
 - [ ] Poll options valid
+- [ ] Source message exists for copy operations
+- [ ] Media file accessible for edit operations
+- [ ] User IDs valid for user operations
+- [ ] Admin permissions for channel management
 
 ### **Media Issues**
 - [ ] Message contains media

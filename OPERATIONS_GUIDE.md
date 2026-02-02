@@ -35,6 +35,36 @@ Send text messages to any chat or user with advanced options.
 
 ---
 
+#### **Copy Message**
+Copy a message from one chat to another with optional caption modification.
+
+**Parameters:**
+- **From Chat**: Source chat ID, username (@channel), or invite link
+- **To Chat**: Target chat ID, username (@channel), or invite link
+- **Message ID**: ID of message to copy
+- **Caption**: Optional caption to replace original message text
+- **Disable Link Preview**: Hide link previews for URLs
+
+**Example:**
+```json
+{
+  "operation": "copyMessage",
+  "fromChatId": "@source_channel",
+  "toChatId": "@target_channel",
+  "messageId": 789,
+  "caption": "Check this out!",
+  "disableLinkPreview": false
+}
+```
+
+**Use Cases:**
+- Content redistribution
+- Cross-channel sharing
+- Message archiving
+- Content curation
+
+---
+
 #### **Edit Message**
 Edit previously sent messages with precision control.
 
@@ -59,6 +89,60 @@ Edit previously sent messages with precision control.
 - Correcting typos
 - Updating information
 - Adding new details to existing messages
+
+---
+
+#### **Edit Message Media**
+Edit the media content of a message with optional caption and formatting.
+
+**Parameters:**
+- **Chat ID**: Target chat ID, username (@channel), or invite link
+- **Message ID**: ID of message to edit
+- **Media**: The media to edit the message with (InputMedia type)
+- **Caption**: New caption for the media (optional, preserves original if empty)
+- **Caption Entities**: Optional formatting entities for the caption
+- **Parse Mode**: Text formatting mode for the caption (default/html/markdown)
+
+**Example:**
+```json
+{
+  "operation": "editMessageMedia",
+  "chatId": "@channel_name",
+  "messageId": 123,
+  "media": "path/to/new/media.jpg",
+  "caption": "Updated caption with formatting",
+  "parseMode": "markdown"
+}
+```
+
+**Use Cases:**
+- Updating media content in messages
+- Adding or modifying captions
+- Correcting media files
+- Content updates
+
+---
+
+#### **Unpin Message**
+Unpin a previously pinned message from a chat.
+
+**Parameters:**
+- **Chat ID**: Target chat ID
+- **Message ID**: ID of message to unpin
+
+**Example:**
+```json
+{
+  "operation": "unpinMessage",
+  "chatId": "@group_name",
+  "messageId": 456
+}
+```
+
+**Use Cases:**
+- Removing outdated pinned messages
+- Content rotation
+- Message management
 
 ---
 
@@ -278,6 +362,75 @@ Get detailed user information including bio and common chats.
 - User verification
 - Profile information gathering
 - Common chat discovery
+
+---
+
+#### **Update Profile**
+Update your Telegram profile information including name and bio.
+
+**Parameters:**
+- **First Name**: New first name for your profile (optional)
+- **Last Name**: New last name for your profile (optional)
+- **About**: New bio/about text for your profile (optional)
+
+**Example:**
+```json
+{
+  "operation": "updateProfile",
+  "firstName": "John",
+  "lastName": "Doe",
+  "about": "Automation enthusiast and developer"
+}
+```
+
+**Use Cases:**
+- Profile updates
+- Bio management
+- Name changes
+
+---
+
+#### **Update Username**
+Change your Telegram username.
+
+**Parameters:**
+- **New Username**: New username for your account
+
+**Example:**
+```json
+{
+  "operation": "updateUsername",
+  "newUsername": "newusername123"
+}
+```
+
+**Use Cases:**
+- Username changes
+- Brand updates
+- Profile rebranding
+
+---
+
+#### **Get Profile Photo**
+Download a user's profile photo in different sizes.
+
+**Parameters:**
+- **User ID**: Username or numeric ID of the user
+- **Photo Size**: Size of the profile photo (small, medium, large, full)
+
+**Example:**
+```json
+{
+  "operation": "getProfilePhoto",
+  "userId": "@username",
+  "photoSize": "medium"
+}
+```
+
+**Use Cases:**
+- Profile photo backup
+- User verification
+- Avatar management
 
 ---
 
@@ -544,9 +697,9 @@ Complete the authentication process and generate a session string.
 | Resource | Operations | Description |
 |----------|------------|-------------|
 | **Session Generator** | Request Code, Sign In & Generate | Account authentication and setup |
-| **Message** | Send Text, Edit, Delete, Pin, Forward, Create Poll | Complete message management |
+| **Message** | Send Text, Edit, Delete, Pin, Forward, Copy, Edit Media, Unpin, Create Poll | Complete message management |
 | **Chat** | Get Chat, Get Dialogs, Join Channel/Group, Leave Channel/Group, Create Group/Channel | Chat and group operations |
-| **User** | Get User Info, Get Full User Details | User information and management |
+| **User** | Get User Info, Get Full User Details, Update Profile, Change Username, Get Profile Photo | User information and management |
 | **Media** | Download Media Files | Media file handling |
 | **Channel** | Get Admin & Bots, Get Public Members, Add/Remove Member, Ban/Unban User, Promote to Admin | Channel and group administration |
 

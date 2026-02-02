@@ -164,6 +164,52 @@ The updated node provides clear error messages:
    }
    ```
 
+---
+
+## New Authentication Features
+
+### Enhanced Session String Generation
+
+The updated authentication system now provides additional information in the session generation output:
+
+```json
+{
+  "success": true,
+  "sessionString": "123456:abcdef...",
+  "apiId": 123456,
+  "apiHash": "abcdef...",
+  "phoneNumber": "+1234567890",
+  "password2fa": "your-2fa-password",
+  "message": "Authentication successful. Use the sessionString in your Telegram nodes.",
+  "note": "IMPORTANT: Copy this sessionString output and save it to a text file for backup. Then restart your n8n instance to prevent \"Ghost Connection timeout\" errors in the terminal logs."
+}
+```
+
+### Key Improvements
+
+1. **Enhanced Error Messages**: More descriptive error messages for common issues
+2. **Session Validation**: Better validation of session strings before use
+3. **Connection Management**: Improved connection cleanup and management
+4. **2FA Support**: Enhanced support for accounts with two-factor authentication
+
+### Troubleshooting New Features
+
+#### **"Session string generation failed" Error**
+If you encounter issues with session string generation:
+
+1. **Check Network Stability**: Ensure stable internet connection during authentication
+2. **Verify 2FA Password**: If using 2FA, ensure correct password format
+3. **Complete Quickly**: Finish authentication within the 10-minute window
+4. **Restart n8n**: Always restart n8n after successful authentication
+
+#### **"Ghost Connection timeout" Prevention**
+To prevent connection timeout errors:
+
+1. **Restart n8n**: Always restart n8n after receiving the session string
+2. **Backup Session**: Save session string to a text file for backup
+3. **Monitor Logs**: Check n8n logs for connection status
+4. **Use Stable Network**: Avoid VPN/proxy during authentication
+
 ## Integration with Other Nodes
 
 The generated `sessionString` can be used directly with:
