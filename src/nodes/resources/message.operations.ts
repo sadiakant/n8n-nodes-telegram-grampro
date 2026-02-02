@@ -1,0 +1,303 @@
+import { IExecuteFunctions } from 'n8n-workflow';
+import { getClient } from '../../core/clientManager';
+import { safeExecute } from '../../core/floodWaitHandler';
+import { withRateLimit } from '../../core/rateLimiter';
+import { Api } from 'telegram';
+import bigInt from 'big-integer';
+import { 
+  TelegramMessage, 
+  SendMessageOptions, 
+  EditMessageOptions, 
+  DeleteMessageOptions, 
+  PinMessageOptions,
+  CreatePollOptions 
+} from '../../types/telegram';
+
+export async function messageRouter(this: IExecuteFunctions, operation: string) {
+
+	const creds: any = await this.getCredentials('telegramApi');
+
+	const client = await getClient(
+		creds.apiId,
+		creds.apiHash,
+		creds.session,
+	);
+
+	switch (operation) {
+
+		case 'sendText':return sendText.call(this, client);
+		case 'forwardMessage': return forwardMessage.call(this, client);
+		case 'getHistory': return getHistory.call(this, client);
+		case 'editMessage': return editMessage.call(this, client);     
+        case 'deleteMessage': return deleteMessage.call(this, client); 
+        case 'pinMessage': return pinMessage.call(this, client);    
+		case 'unpinMessage': return unpinMessage.call(this, client);
+		case 'sendPoll': return sendPoll.call(this, client);
+		case 'copyMessage': return copyMessage.call(this, client);
+
+		default:
+			throw new Error(`Message operation not supported: ${operation}`);
+	}
+}
+
+// --- FUNCTIONS ---
+
+async function editMessage(this: IExecuteFunctions, client: any) {
+    const chatId = this.getNodeParameter('chatId', 0);
+    const messageId = Number(this.getNodeParameter('messageId', 0));
+    const text = this.getNodeParameter('text', 0);
+    
+    // IMPORTANT: Ensure this parameter exists in the UI properties
+    const noWebpage = this.getNodeParameter('noWebpage', 0) as boolean;
+
+    // Use safeExecute once and pass all parameters
+    const result = await safeExecute(() => 
+        client.editMessage(chatId, { 
+            message: messageId, 
+            text, 
+            noWebpage 
+        })
+    );
+
+    return [[{ 
+        json: { 
+            success: true, 
+            id: result.id, 
+            text: result.message,
+            noWebpage: noWebpage 
+        } 
+    }]];
+}
+
+async function deleteMessage(this: IExecuteFunctions, client: any) {
+    const chatId = this.getNodeParameter('chatId', 0);
+    const messageId = Number(this.getNodeParameter('messageId', 0));
+    const revoke = this.getNodeParameter('revoke', 0) as boolean; // Get toggle value
+
+    await safeExecute(() => 
+        client.deleteMessages(chatId, [messageId], { revoke })
+    );
+
+    return [[{ json: { success: true, deletedId: messageId, revoked: revoke } }]];
+}
+
+async function pinMessage(this: IExecuteFunctions, client: any) {
+    const chatId = this.getNodeParameter('chatId', 0);
+    const messageId = Number(this.getNodeParameter('messageId', 0));
+    const notify = this.getNodeParameter('notify', 0) as boolean; // Get toggle value
+
+    await safeExecute(() => 
+        client.pinMessage(chatId, messageId, { notify })
+    );
+
+    return [[{ json: { success: true, pinnedId: messageId, notified: notify } }]];
+}
+
+async function sendText(this: IExecuteFunctions, client: any) {
+    const chatId = this.getNodeParameter('chatId', 0);
+    const text = this.getNodeParameter('text', 0);
+    
+    // 1. Get the parameter (defaults to 0 if not provided)
+    const replyTo = this.getNodeParameter('replyTo', 0) as number;
+
+    const result = await withRateLimit(async () =>
+        safeExecute(() =>
+            client.sendMessage(chatId, { 
+                message: text,
+                // 2. Only add replyTo if a valid ID is provided
+                replyTo: replyTo > 0 ? replyTo : undefined,
+            })
+        )
+    );
+
+    return [[{
+        json: {
+            id: result.id,
+            text: result.message,
+            replyToId: result.replyTo?.replyToMsgId || null,
+            chatId: result.chatId?.toString(),
+            fromId: result.fromId?.toString(),
+			date: result.date,
+        },
+    }]];
+}
+
+async function forwardMessage(this: IExecuteFunctions, client: any) {
+
+    const fromChat = this.getNodeParameter('fromChatId', 0);
+    const toChat = this.getNodeParameter('toChatId', 0);
+    const messageId = Number(this.getNodeParameter('messageId', 0));
+
+    // Ensure IDs are resolved to entities
+    const fromPeer = await client.getEntity(fromChat);
+    const toPeer = await client.getEntity(toChat);
+
+    // FIXED: Changed 'id' to 'messages'
+    const result = await client.forwardMessages(toPeer, {
+        fromPeer: fromPeer,
+        messages: [messageId], 
+    });
+
+    // Handle array or single object response
+    const msg = Array.isArray(result) ? result[0] : result;
+
+    return [[{
+        json: {
+            success: true,
+            message: 'Message forwarded successfully',
+            forwardedId: msg.id,
+            text: msg.message,
+            chatId: msg.chatId?.toString(),
+            fromId: msg.fromId?.toString(),
+            date: msg.date,
+        },
+    }]];
+}
+
+async function getHistory(this: IExecuteFunctions, client: any) {
+
+	const chatId = this.getNodeParameter('chatId', 0);
+	const limit = this.getNodeParameter('limit', 0);
+
+	const messages = await safeExecute(() =>
+		client.getMessages(chatId, { limit }),
+	);
+
+const items = messages.map((m: any) => ({
+    json: {
+        id: m.id,
+        text: m.message || '',
+        date: m.date,
+        humanDate: new Date(m.date * 1000).toISOString(), // Added: Readable date
+        fromId: m.fromId?.userId?.toString() || m.fromId?.toString() || null,
+        chatId: m.peerId?.toString(), // Added: Source Chat ID
+        isReply: !!m.replyTo,        // Added: Boolean check
+      	isOutgoing: m.out, // true if you sent it, false if received
+        direction: m.out ? 'sent' : 'received',
+		mediaType: m.media ? m.media.constructor.name : null, // Added: 'MessageMediaPhoto' etc.
+    },
+}));
+	return [items];
+}
+
+async function unpinMessage(this: IExecuteFunctions, client: any) {
+    const chatId = this.getNodeParameter('chatId', 0) as string;
+    const messageId = Number(this.getNodeParameter('messageId', 0));
+
+    await safeExecute(() => 
+        client.invoke(new Api.messages.UpdatePinnedMessage({
+            peer: chatId,
+            id: messageId,
+            unpin: true,
+        }))
+    );
+
+    return [[{ json: { success: true, unpinnedId: messageId } }]];
+}
+
+async function sendPoll(this: IExecuteFunctions, client: any) {
+    const chatId = this.getNodeParameter('chatId', 0);
+    const question = this.getNodeParameter('pollQuestion', 0) as string;
+    const options = this.getNodeParameter('pollOptions', 0) as string[];
+    const isQuiz = this.getNodeParameter('isQuiz', 0) as boolean;
+    const isAnonymous = this.getNodeParameter('anonymous', 0, true) as boolean;
+
+    // 1. Get the correct answer index if it's a quiz
+    let correctAnswers: Buffer[] | undefined = undefined;
+    if (isQuiz) {
+        const correctIndex = this.getNodeParameter('correctAnswerIndex', 0) as number;
+        // The index must correspond to the 'option' buffer we create below
+        correctAnswers = [Buffer.from(correctIndex.toString())];
+    }
+
+    const peer = await client.getEntity(chatId);
+    const isBroadcastChannel = peer.className === 'Channel' && peer.broadcast;
+    const publicVoters = isBroadcastChannel ? false : !isAnonymous;
+    const pollId = bigInt(Math.floor(Math.random() * 1000000000));
+
+    const result = await safeExecute(() => 
+        client.invoke(new Api.messages.SendMedia({
+            peer: peer,
+            media: new Api.InputMediaPoll({
+                poll: new Api.Poll({
+                    id: pollId,
+                    question: new Api.TextWithEntities({
+                        text: question,
+                        entities: [],
+                    }),
+                    answers: options.map((opt, index) => new Api.PollAnswer({ 
+                        text: new Api.TextWithEntities({ text: opt, entities: [] }),
+                        option: Buffer.from(index.toString()) 
+                    })),
+                    closed: false,
+                    publicVoters: publicVoters,
+                    multipleChoice: false,
+                    quiz: isQuiz,
+                }),
+                // 2. CRITICAL: Pass the correct answers here (outside the Poll object)
+                correctAnswers: correctAnswers, 
+            }),
+            message: '', 
+            randomId: bigInt(Math.floor(Math.random() * 1000000000)), 
+        }))
+    );
+
+    return [[{ json: { success: true, pollId: pollId.toString() } }]];
+}
+
+async function copyMessage(this: IExecuteFunctions, client: any) {
+    const fromChat = this.getNodeParameter('fromChatId', 0);
+    const toChat = this.getNodeParameter('toChatId', 0);
+    const messageId = Number(this.getNodeParameter('messageId', 0));
+    const caption = this.getNodeParameter('caption', 0, '') as string;
+    const disableLinkPreview = this.getNodeParameter('disableLinkPreview', 0, false) as boolean;
+
+    // Ensure IDs are resolved to entities
+    const fromPeer = await client.getEntity(fromChat);
+    const toPeer = await client.getEntity(toChat);
+
+    // Get the original message to copy its content
+    const messages = await safeExecute(() =>
+        client.getMessages(fromPeer, { ids: [messageId] })
+    );
+
+    const originalMessage = messages[0];
+    if (!originalMessage) {
+        throw new Error('Original message not found');
+    }
+
+    // Prepare the message content for copying
+    let messageContent = originalMessage.message || '';
+    
+    // If caption is provided, use it instead of original message
+    if (caption && caption.trim()) {
+        messageContent = caption;
+    }
+
+    // Copy the message with media if present
+    const result = await withRateLimit(async () =>
+        safeExecute(() =>
+            client.sendMessage(toPeer, {
+                message: messageContent,
+                file: originalMessage.media,
+                linkPreview: !disableLinkPreview,
+                formattingEntities: originalMessage.entities || [],
+            })
+        )
+    );
+
+    return [[{
+        json: {
+            success: true,
+            message: 'Message copied successfully',
+            copiedId: result.id,
+            originalId: originalMessage.id,
+            text: result.message,
+            chatId: result.chatId?.toString(),
+            fromId: result.fromId?.toString(),
+            date: result.date,
+            hasMedia: !!originalMessage.media,
+            caption: caption || messageContent,
+        },
+    }]];
+}

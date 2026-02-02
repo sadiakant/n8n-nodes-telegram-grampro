@@ -1,0 +1,64 @@
+{
+  "name": "n8n-nodes-telegram-grampro",
+  "version": "1.0.0",
+  "description": "Telegram GramPro production nodes for n8n",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "node esbuild.config.mjs && node copy-assets.mjs",
+    "dev": "node esbuild.config.mjs --watch",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "n8n",
+    "n8n-nodes",
+    "telegram",
+    "telegram-api",
+    "telegram-mtproto",
+    "telegram-grampro",
+    "gramjs",
+    "automation",
+    "workflow"
+  ],
+  "author": {
+    "name": "sadiakant",
+    "email": "krushnakantsadiya@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sadiakant/n8n-nodes-telegram-grampro.git"
+  },
+  "homepage": "https://github.com/sadiakant/n8n-nodes-telegram-grampro#readme",
+  "bugs": {
+    "url": "https://github.com/sadiakant/n8n-nodes-telegram-grampro/issues"
+  },
+  "dependencies": {
+    "big-integer": "^1.6.52",
+    "n8n-workflow": "^1.17.0",
+    "telegram": "^2.26.22"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "esbuild": "^0.27.2",
+    "input": "^1.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "n8n": {
+    "nodes": [
+      "dist/nodes/TelegramMtproto.node.js",
+      "dist/nodes/TelegramTrigger.node.js"
+    ],
+    "credentials": [
+      "dist/credentials/TelegramApi.credentials.js"
+    ]
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
