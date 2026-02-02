@@ -10,7 +10,8 @@ import {
   EditMessageOptions, 
   DeleteMessageOptions, 
   PinMessageOptions,
-  CreatePollOptions 
+  CreatePollOptions,
+  EditMessageMediaOptions
 } from '../../types/telegram';
 
 export async function messageRouter(this: IExecuteFunctions, operation: string) {
@@ -34,6 +35,7 @@ export async function messageRouter(this: IExecuteFunctions, operation: string) 
 		case 'unpinMessage': return unpinMessage.call(this, client);
 		case 'sendPoll': return sendPoll.call(this, client);
 		case 'copyMessage': return copyMessage.call(this, client);
+		case 'editMessageMedia': return editMessageMedia.call(this, client);
 
 		default:
 			throw new Error(`Message operation not supported: ${operation}`);
@@ -65,6 +67,62 @@ async function editMessage(this: IExecuteFunctions, client: any) {
             id: result.id, 
             text: result.message,
             noWebpage: noWebpage 
+        } 
+    }]];
+}
+
+async function editMessageMedia(this: IExecuteFunctions, client: any) {
+    const chatId = this.getNodeParameter('chatId', 0) as string;
+    const messageId = Number(this.getNodeParameter('messageId', 0));
+    const media = this.getNodeParameter('media', 0);
+    
+    const captionInput = this.getNodeParameter('caption', 0, '') as string;
+    const captionEntitiesInput = this.getNodeParameter('captionEntities', 0, []) as any[];
+    const parseMode = this.getNodeParameter('parseMode', 0, 'default') as string;
+
+    let finalCaption = captionInput;
+    let finalEntities = captionEntitiesInput;
+    let debugInfo = "Using new caption";
+
+    // --- LOGIC: If Caption is Empty, Preserve Original ---
+    if (!captionInput || captionInput.trim() === '') {
+        try {
+            // We use getMessages. If this returns empty, it means the Message ID 
+            // does not exist in the Chat ID provided in the n8n node.
+            const messages = await client.getMessages(chatId, { ids: [messageId] });
+            
+            if (messages && messages.length > 0 && messages[0]) {
+                const msg = messages[0];
+                finalCaption = msg.message || "";
+                finalEntities = msg.entities || [];
+                debugInfo = "Successfully preserved original text";
+            } else {
+                // This is the error you are seeing
+                debugInfo = `Error: Message ${messageId} not found in chat ${chatId}. Check your 'Chat ID' field!`;
+            }
+        } catch (error) {
+            debugInfo = `Fetch error: ${error.message}`;
+        }
+    }
+
+    // --- EXECUTION ---
+    const result = await safeExecute(() => 
+        client.editMessage(chatId, { 
+            message: messageId, 
+            file: media, 
+            text: finalCaption, 
+            formattingEntities: (finalEntities && finalEntities.length > 0) ? finalEntities : undefined,
+            parseMode: (finalEntities && finalEntities.length > 0) ? undefined : (parseMode !== 'default' ? parseMode : undefined)
+        })
+    );
+
+    return [[{ 
+        json: { 
+            success: true, 
+            id: result.id, 
+            text: result.message, 
+            debug_logic: debugInfo,
+            target_chat: chatId
         } 
     }]];
 }
@@ -110,13 +168,26 @@ async function sendText(this: IExecuteFunctions, client: any) {
         )
     );
 
+    // Extract sender ID with comprehensive fallback for different message types
+    let senderId: string | null = null;
+    
+    if (result.fromId) {
+        // Try different possible properties for sender ID
+        senderId = result.fromId.userId?.toString() || 
+                   result.fromId.chatId?.toString() || 
+                   result.fromId.channelId?.toString() ||
+                   result.fromId.user_id?.toString() ||
+                   result.fromId.chat_id?.toString() ||
+                   result.fromId.channel_id?.toString();
+    }
+
     return [[{
         json: {
             id: result.id,
             text: result.message,
             replyToId: result.replyTo?.replyToMsgId || null,
             chatId: result.chatId?.toString(),
-            fromId: result.fromId?.toString(),
+            fromId: senderId,
 			date: result.date,
         },
     }]];
@@ -141,6 +212,19 @@ async function forwardMessage(this: IExecuteFunctions, client: any) {
     // Handle array or single object response
     const msg = Array.isArray(result) ? result[0] : result;
 
+    // Extract sender ID with comprehensive fallback for different message types
+    let senderId: string | null = null;
+    
+    if (msg.fromId) {
+        // Try different possible properties for sender ID
+        senderId = msg.fromId.userId?.toString() || 
+                   msg.fromId.chatId?.toString() || 
+                   msg.fromId.channelId?.toString() ||
+                   msg.fromId.user_id?.toString() ||
+                   msg.fromId.chat_id?.toString() ||
+                   msg.fromId.channel_id?.toString();
+    }
+
     return [[{
         json: {
             success: true,
@@ -148,7 +232,7 @@ async function forwardMessage(this: IExecuteFunctions, client: any) {
             forwardedId: msg.id,
             text: msg.message,
             chatId: msg.chatId?.toString(),
-            fromId: msg.fromId?.toString(),
+            fromId: senderId,
             date: msg.date,
         },
     }]];
@@ -170,7 +254,10 @@ const items = messages.map((m: any) => ({
         date: m.date,
         humanDate: new Date(m.date * 1000).toISOString(), // Added: Readable date
         fromId: m.fromId?.userId?.toString() || m.fromId?.toString() || null,
-        chatId: m.peerId?.toString(), // Added: Source Chat ID
+        chatId: m.peerId?.userId?.toString() || 
+                 m.peerId?.chatId?.toString() || 
+                 m.peerId?.channelId?.toString() || 
+                 m.peerId?.toString() || null, // Fixed: Proper chat ID extraction
         isReply: !!m.replyTo,        // Added: Boolean check
       	isOutgoing: m.out, // true if you sent it, false if received
         direction: m.out ? 'sent' : 'received',
@@ -286,6 +373,42 @@ async function copyMessage(this: IExecuteFunctions, client: any) {
         )
     );
 
+    // Extract sender ID with comprehensive fallback for different message types
+    let senderId: string | null = null;
+    
+    if (result.fromId) {
+        // Try different possible properties for sender ID
+        senderId = result.fromId.userId?.toString() || 
+                   result.fromId.chatId?.toString() || 
+                   result.fromId.channelId?.toString() ||
+                   result.fromId.user_id?.toString() ||
+                   result.fromId.chat_id?.toString() ||
+                   result.fromId.channel_id?.toString();
+    }
+    
+    // If still null, try to get sender from the original message
+    if (!senderId && originalMessage.fromId) {
+        senderId = originalMessage.fromId.userId?.toString() || 
+                   originalMessage.fromId.chatId?.toString() || 
+                   originalMessage.fromId.channelId?.toString() ||
+                   originalMessage.fromId.user_id?.toString() ||
+                   originalMessage.fromId.chat_id?.toString() ||
+                   originalMessage.fromId.channel_id?.toString();
+    }
+    
+    // For bot messages, try to get the bot's user ID from the message itself
+    if (!senderId && originalMessage.post_author) {
+        // Some bot messages have post_author field
+        senderId = originalMessage.post_author;
+    }
+    
+    // Final fallback: try to get from peer_id
+    if (!senderId && originalMessage.peerId) {
+        senderId = originalMessage.peerId.userId?.toString() || 
+                   originalMessage.peerId.chatId?.toString() || 
+                   originalMessage.peerId.channelId?.toString();
+    }
+
     return [[{
         json: {
             success: true,
@@ -294,7 +417,7 @@ async function copyMessage(this: IExecuteFunctions, client: any) {
             originalId: originalMessage.id,
             text: result.message,
             chatId: result.chatId?.toString(),
-            fromId: result.fromId?.toString(),
+            fromId: senderId,
             date: result.date,
             hasMedia: !!originalMessage.media,
             caption: caption || messageContent,

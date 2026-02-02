@@ -161,6 +161,18 @@ export interface EditMessageOptions {
 }
 
 /**
+ * Message media editing options
+ */
+export interface EditMessageMediaOptions {
+  chatId: string;
+  messageId: number;
+  media: any; // InputMedia type from telegram-api
+  caption?: string;
+  captionEntities?: any[];
+  parseMode?: string;
+}
+
+/**
  * Message deletion options
  */
 export interface DeleteMessageOptions {

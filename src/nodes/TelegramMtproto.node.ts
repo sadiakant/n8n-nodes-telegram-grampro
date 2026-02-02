@@ -49,7 +49,7 @@ export class TelegramMtproto implements INodeType {
                 ],
                 default: 'message',
             },
- 			// MESSAGE OPS
+			// MESSAGE OPS
 			{
 				displayName: 'Operation',
 				name: 'operation',
@@ -65,6 +65,7 @@ export class TelegramMtproto implements INodeType {
 					{ name: 'Copy Message', value: 'copyMessage' },
 					{ name: 'Get History', value: 'getHistory' },
 					{ name: 'Edit Message', value: 'editMessage' },    
+					{ name: 'Edit Message Media', value: 'editMessageMedia' },
 					{ name: 'Delete Message', value: 'deleteMessage' },
 					{ name: 'Pin Message', value: 'pinMessage' },
 					{ name: 'Unpin Message', value: 'unpinMessage' },
@@ -326,7 +327,7 @@ export class TelegramMtproto implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['message'],
-						operation: ['editMessage', 'deleteMessage', 'pinMessage', 'unpinMessage', 'forwardMessage', 'copyMessage'],
+						operation: ['editMessage', 'editMessageMedia', 'deleteMessage', 'pinMessage', 'unpinMessage', 'forwardMessage', 'copyMessage'],
 					},
 				},
 			},
@@ -396,6 +397,79 @@ export class TelegramMtproto implements INodeType {
 					},
 				},
 				description: 'Whether to disable the link preview for URLs in the message',
+			},
+			// --- EDIT MESSAGE MEDIA PROPERTIES ---
+			{
+				displayName: 'Chat ID',
+				name: 'chatId',
+				type: 'string',
+				default: '',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['editMessageMedia'],
+					},
+				},
+				description: 'Username (@channel), Invite Link (t.me/...), or numeric ID',
+			},
+			{
+				displayName: 'Media',
+				name: 'media',
+				type: 'string',
+				default: '',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['editMessageMedia'],
+					},
+				},
+				description: 'The media to edit the message with (InputMedia type)',
+			},
+			{
+                displayName: 'Caption',
+                name: 'caption',
+                type: 'string',
+                default: '',
+                displayOptions: {
+                    show: {
+                        resource: ['message'],
+                        operation: ['editMessageMedia'],
+                    },
+                },
+                description: 'New caption for the media. If left empty, the original caption will be preserved.',
+            },
+			{
+				displayName: 'Caption Entities',
+				name: 'captionEntities',
+				type: 'json',
+				default: [],
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['editMessageMedia'],
+					},
+				},
+				description: 'Optional formatting entities for the caption (e.g., bold, italic, links)',
+			},
+			{
+				displayName: 'Parse Mode',
+				name: 'parseMode',
+				type: 'options',
+				default: 'default',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['editMessageMedia'],
+					},
+				},
+				options: [
+					{ name: 'Default', value: 'default' },
+					{ name: 'HTML', value: 'html' },
+					{ name: 'Markdown', value: 'markdown' },
+				],
+				description: 'Text formatting mode for the caption',
 			},
 			// --- COPY MESSAGE PROPERTIES ---
 			{
