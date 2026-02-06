@@ -1,9 +1,9 @@
-name: Publish to npm
-
+name: Publish to NPM
 on:
   push:
     branches: [ main ]
     tags: [ 'v*' ]
+  workflow_dispatch: # <--- This adds the manual "Run workflow" button
 
 jobs:
   publish:
@@ -34,7 +34,3 @@ jobs:
       # 2. Publish using the environment's id-token
       - name: Publish to npm
         run: npm publish --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} # Only if NOT using Trusted Publishing
-          # NOTE: If using ONLY Trusted Publishing, you don't need the secret above,
-          # but the '--provenance' flag requires the latest npm version.
