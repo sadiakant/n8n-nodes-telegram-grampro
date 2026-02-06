@@ -63,7 +63,7 @@ export class TelegramMtproto implements INodeType {
 					{ name: 'Send Text', value: 'sendText' },
 					{ name: 'Forward Message', value: 'forwardMessage' },
 					{ name: 'Copy Message', value: 'copyMessage' },
-					{ name: 'Get History', value: 'getHistory' },
+					{ name: 'Get Messages', value: 'getHistory' },
 					{ name: 'Edit Message', value: 'editMessage' },    
 					{ name: 'Edit Message Media', value: 'editMessageMedia' },
 					{ name: 'Delete Message', value: 'deleteMessage' },
@@ -333,15 +333,119 @@ export class TelegramMtproto implements INodeType {
 			},
 
 			{
+				displayName: 'Mode',
+				name: 'mode',
+				type: 'options',
+				options: [
+					{ name: 'Recent Messages (Limit)', value: 'limit' },
+					{ name: 'Last X Hours', value: 'hours' },
+					{ name: 'Date Range', value: 'range' },
+				],
+				default: 'limit',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['getHistory'],
+					},
+				},
+			},
+			{
 				displayName: 'Limit',
 				name: 'limit',
 				type: 'number',
 				default: 10,
 				displayOptions: {
 					show: {
-						operation: ['getHistory', 'getDialogs'],
+						resource: ['message'],
+						operation: ['getHistory'],
+						mode: ['limit'],
 					},
 				},
+			},
+			{
+				displayName: 'Last Hours',
+				name: 'hours',
+				type: 'number',
+				default: 24,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['getHistory'],
+						mode: ['hours'],
+					},
+				},
+			},
+			{
+				displayName: 'From Date',
+				name: 'fromDate',
+				type: 'dateTime',
+				default: '',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['getHistory'],
+						mode: ['range'],
+					},
+				},
+			},
+			{
+				displayName: 'To Date',
+				name: 'toDate',
+				type: 'dateTime',
+				default: '',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['getHistory'],
+						mode: ['range'],
+					},
+				},
+			},
+			{
+				displayName: 'Max Messages',
+				name: 'maxMessages',
+				type: 'number',
+				default: 500,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['getHistory'],
+						mode: ['hours', 'range'],
+					},
+				},
+				description: 'Safety cap for very active chats',
+			},
+			{
+				displayName: 'Has Media',
+				name: 'onlyMedia',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['getHistory'],
+					},
+				},
+				description: 'Whether to only return messages that contain media (photos, videos, documents)',
+			},
+			{
+				displayName: 'Media Type',
+				name: 'mediaType',
+				type: 'multiOptions',
+				options: [
+					{ name: 'Photo', value: 'photo' },
+					{ name: 'Video', value: 'video' },
+					{ name: 'Document', value: 'document' },
+				],
+				default: [],
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['getHistory'],
+						onlyMedia: [true],
+					},
+				},
+				description: 'Filter by specific media types. Leave empty to allow all media.',
 			},
 
 			{

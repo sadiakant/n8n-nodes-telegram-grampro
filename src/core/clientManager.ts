@@ -48,6 +48,7 @@ export async function getClient(apiId: number, apiHash: string, session: string)
             useWSS: false, // TCP is more stable for server-side n8n than WSS
             autoReconnect: true,
         });
+        client.setLogLevel(LogLevel.ERROR);
 
         try {
             await client.connect();

@@ -18,7 +18,7 @@ Telegram GramPro is a comprehensive n8n custom node that brings the full power o
 ### 🌟 **Key Features**
 
 #### **Core Operations**
-- **Messages**: Send, edit, delete, pin, forward, copy, create polls and quizzes
+- **Messages**: Send, get messages (time-based filters), edit, delete, pin, forward, copy, create polls and quizzes
 - **Chats**: Get chats, dialogs, join/leave, create groups/channels  
 - **Users**: Get user info, full details with bio and common chats, update profile, change username, get profile photos
 - **Media**: Download media files with progress tracking
@@ -96,7 +96,7 @@ For detailed documentation of all operations with parameters, examples, and use 
 | Resource | Operations |
 |----------|------------|
 | **Session Generator** | Request Code, Sign In & Generate |
-| **Message** | Send Text, Edit, Delete, Pin, Forward, Copy, Create Poll |
+| **Message** | Send Text, Get Messages, Edit, Delete, Pin, Forward, Copy, Edit Media, Create Poll |
 | **Chat** | Get Chat, Get Dialogs, Join Channel/Group, Leave Channel/Group, Create Group/Channel |
 | **User** | Get User Info, Get Full User Details, Update Profile, Change Username, Get Profile Photo |
 | **Media** | Download Media Files |
@@ -153,6 +153,12 @@ Prevents hitting Telegram's API rate limits:
 ## 🚨 Troubleshooting
 
 For comprehensive troubleshooting guidance, common issues, and solutions, see our [Troubleshooting Guide](TROUBLESHOOTING_GUIDE.md).
+
+## Logging
+
+Set a lower log level to reduce terminal noise:
+- `GRAMPRO_LOG_LEVEL=error|warn|info|debug`
+- `N8N_LOG_LEVEL=error|warn|info|debug` (used if `GRAMPRO_LOG_LEVEL` is not set)
 
 ## 🎨 Workflow Examples
 

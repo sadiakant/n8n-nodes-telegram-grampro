@@ -524,7 +524,14 @@ Enable detailed logging for troubleshooting:
    export NODE_ENV=development
    ```
 
-2. **Restart n8n**
+2. **Control Log Volume (Optional)**
+   ```bash
+   export GRAMPRO_LOG_LEVEL=info
+   # Or use N8N_LOG_LEVEL if GRAMPRO_LOG_LEVEL is not set
+   export N8N_LOG_LEVEL=info
+   ```
+
+3. **Restart n8n**
    ```bash
    # Stop n8n
    pkill -f n8n
@@ -533,7 +540,7 @@ Enable detailed logging for troubleshooting:
    n8n start
    ```
 
-3. **Monitor Logs**
+4. **Monitor Logs**
    ```bash
    # View n8n logs
    tail -f ~/.n8n/logs/n8n.log

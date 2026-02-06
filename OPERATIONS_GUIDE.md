@@ -35,6 +35,41 @@ Send text messages to any chat or user with advanced options.
 
 ---
 
+#### **Get Messages**
+Retrieve messages from a chat with optional time and media filters.
+
+**Parameters:**
+- **Chat ID**: Target chat ID, username (@channel), or invite link
+- **Mode**: Recent Messages (Limit), Last X Hours, or Date Range
+- **Limit**: Number of recent messages to fetch (Mode = Limit)
+- **Last Hours**: How many hours back to scan (Mode = Last X Hours)
+- **From Date**: Start date/time (Mode = Date Range)
+- **To Date**: End date/time (Mode = Date Range)
+- **Max Messages**: Safety cap for very active chats (Mode = Last X Hours / Date Range)
+- **Has Media**: Only return messages that contain media
+- **Media Type**: Filter by Photo, Video, or Document
+
+**Example:**
+```json
+{
+  "operation": "getHistory",
+  "chatId": "@channel_name",
+  "mode": "hours",
+  "hours": 6,
+  "maxMessages": 500,
+  "onlyMedia": true,
+  "mediaType": ["photo", "video"]
+}
+```
+
+**Use Cases:**
+- Fetch recent messages
+- Time-based monitoring
+- Media-only scanning
+- Audit windows for moderation
+
+---
+
 #### **Copy Message**
 Copy a message from one chat to another with optional caption modification.
 
@@ -697,7 +732,7 @@ Complete the authentication process and generate a session string.
 | Resource | Operations | Description |
 |----------|------------|-------------|
 | **Session Generator** | Request Code, Sign In & Generate | Account authentication and setup |
-| **Message** | Send Text, Edit, Delete, Pin, Forward, Copy, Edit Media, Unpin, Create Poll | Complete message management |
+| **Message** | Send Text, Get Messages, Edit, Delete, Pin, Forward, Copy, Edit Media, Unpin, Create Poll | Complete message management |
 | **Chat** | Get Chat, Get Dialogs, Join Channel/Group, Leave Channel/Group, Create Group/Channel | Chat and group operations |
 | **User** | Get User Info, Get Full User Details, Update Profile, Change Username, Get Profile Photo | User information and management |
 | **Media** | Download Media Files | Media file handling |

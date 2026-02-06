@@ -241,29 +241,94 @@ async function forwardMessage(this: IExecuteFunctions, client: any) {
 async function getHistory(this: IExecuteFunctions, client: any) {
 
 	const chatId = this.getNodeParameter('chatId', 0);
-	const limit = this.getNodeParameter('limit', 0);
+	const mode = this.getNodeParameter('mode', 0, 'limit') as string;
+	const onlyMedia = this.getNodeParameter('onlyMedia', 0, false) as boolean;
+	const mediaTypes = this.getNodeParameter('mediaType', 0, []) as string[];
 
-	const messages = await safeExecute(() =>
-		client.getMessages(chatId, { limit }),
-	);
+	let messages: any[] = [];
 
-const items = messages.map((m: any) => ({
-    json: {
-        id: m.id,
-        text: m.message || '',
-        date: m.date,
-        humanDate: new Date(m.date * 1000).toISOString(), // Added: Readable date
-        fromId: m.fromId?.userId?.toString() || m.fromId?.toString() || null,
-        chatId: m.peerId?.userId?.toString() || 
-                 m.peerId?.chatId?.toString() || 
-                 m.peerId?.channelId?.toString() || 
-                 m.peerId?.toString() || null, // Fixed: Proper chat ID extraction
-        isReply: !!m.replyTo,        // Added: Boolean check
-      	isOutgoing: m.out, // true if you sent it, false if received
-        direction: m.out ? 'sent' : 'received',
-		mediaType: m.media ? m.media.constructor.name : null, // Added: 'MessageMediaPhoto' etc.
-    },
-}));
+	if (mode === 'limit') {
+		const limit = this.getNodeParameter('limit', 0, 10) as number;
+		messages = await safeExecute(() =>
+			client.getMessages(chatId, { limit }),
+		);
+	} else {
+		const maxMessages = this.getNodeParameter('maxMessages', 0, 500) as number;
+		const iterOptions: Record<string, any> = {};
+		if (maxMessages > 0) {
+			iterOptions.limit = maxMessages;
+		}
+
+		if (mode === 'hours') {
+			const hours = this.getNodeParameter('hours', 0, 24) as number;
+			const cutoffTime = Math.floor(Date.now() / 1000) - (hours * 3600);
+
+			for await (const msg of client.iterMessages(chatId, iterOptions)) {
+				if (msg.date < cutoffTime) {
+					break;
+				}
+				messages.push(msg);
+			}
+		} else if (mode === 'range') {
+			const fromDateStr = this.getNodeParameter('fromDate', 0, '') as string;
+			const toDateStr = this.getNodeParameter('toDate', 0, '') as string;
+
+			const fromTime = fromDateStr ? Math.floor(new Date(fromDateStr).getTime() / 1000) : 0;
+			const toTime = toDateStr ? Math.floor(new Date(toDateStr).getTime() / 1000) : Math.floor(Date.now() / 1000);
+
+			for await (const msg of client.iterMessages(chatId, iterOptions)) {
+				if (msg.date > toTime) {
+					continue;
+				}
+				if (msg.date < fromTime) {
+					break;
+				}
+				messages.push(msg);
+			}
+		}
+	}
+
+	const items = [];
+	for (const m of messages) {
+		if (!m || m._ === 'MessageEmpty') continue;
+
+		const isPhoto = !!m.media?.photo;
+		const isDocument = !!m.media?.document;
+		const isVideo = !!m.media?.video || (isDocument && m.media.document?.mimeType?.includes('video'));
+		const hasMedia = isPhoto || isDocument || isVideo || !!m.media;
+
+		if (onlyMedia && !hasMedia) {
+			continue;
+		}
+
+		if (onlyMedia && mediaTypes.length > 0) {
+			let match = false;
+			if (mediaTypes.includes('photo') && isPhoto) match = true;
+			if (mediaTypes.includes('video') && isVideo) match = true;
+			if (mediaTypes.includes('document') && isDocument && !isVideo) match = true;
+			if (!match) continue;
+		}
+
+		items.push({
+			json: {
+				id: m.id,
+				text: m.message || '',
+				date: m.date,
+				humanDate: new Date(m.date * 1000).toISOString(),
+				fromId: m.fromId?.userId?.toString() || m.fromId?.toString() || null,
+				chatId: m.peerId?.userId?.toString() ||
+					m.peerId?.chatId?.toString() ||
+					m.peerId?.channelId?.toString() ||
+					m.peerId?.toString() || null,
+				isReply: !!m.replyTo,
+				isOutgoing: m.out,
+				direction: m.out ? 'sent' : 'received',
+				hasMedia,
+				mediaType: isPhoto ? 'photo' : isVideo ? 'video' : isDocument ? 'document' : 'other',
+			},
+		});
+	}
+
 	return [items];
 }
 
