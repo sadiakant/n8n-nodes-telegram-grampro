@@ -8,12 +8,13 @@ const clients = new Map<string, TelegramClient>();
 // Store active connection promises to prevent race conditions (Thundering Herd)
 const connectionLocks = new Map<string, Promise<TelegramClient>>();
 
-export async function getClient(apiId: number, apiHash: string, session: string) {
-    const key = `${apiId}:${session.slice(0, 10)}`; // Create a unique key based on ID and partial session
+export async function getClient(apiId: number | string, apiHash: string, session: string) {
+    const numericApiId = typeof apiId === 'string' ? parseInt(apiId, 10) : apiId;
+    const key = `${numericApiId}:${session.slice(0, 10)}`; // Create a unique key based on ID and partial session
 
     // 1. If this client is currently connecting, wait for that specific promise
     if (connectionLocks.has(key)) {
-        logger.debug(`[ClientManager] Waiting for existing connection lock for ${apiId}...`);
+        logger.debug(`[ClientManager] Waiting for existing connection lock for ${numericApiId}...`);
         return await connectionLocks.get(key);
     }
 
@@ -27,12 +28,12 @@ export async function getClient(apiId: number, apiHash: string, session: string)
         }
 
         // If not connected, try to reconnect gracefully
-        logger.warn(`[ClientManager] Client ${apiId} found but disconnected. Attempting heal...`);
+        logger.warn(`[ClientManager] Client ${numericApiId} found but disconnected. Attempting heal...`);
         try {
             await existingClient.connect();
             return existingClient;
         } catch (e) {
-            logger.error(`[ClientManager] Heal failed for ${apiId}. Destroying and recreating.`);
+            logger.error(`[ClientManager] Heal failed for ${numericApiId}. Destroying and recreating.`);
             await gracefulDestroy(existingClient);
             clients.delete(key);
         }
@@ -40,10 +41,10 @@ export async function getClient(apiId: number, apiHash: string, session: string)
 
     // 3. Create a new Connection (Protected by a Lock)
     const connectPromise = (async () => {
-        logger.info(`[ClientManager] Initializing new client for ${apiId}...`);
+        logger.info(`[ClientManager] Initializing new client for ${numericApiId}...`);
         
         const stringSession = new StringSession(session);
-        const client = new TelegramClient(stringSession, apiId, apiHash, {
+        const client = new TelegramClient(stringSession, numericApiId, apiHash, {
             connectionRetries: 5,
             useWSS: false, // TCP is more stable for server-side n8n than WSS
             autoReconnect: true,
@@ -57,12 +58,12 @@ export async function getClient(apiId: number, apiHash: string, session: string)
             // We use 'getMe' as a lightweight verification that we are authorized and socket is alive
             await client.getMe();
             
-            logger.info(`[ClientManager] Connection established for ${apiId}`);
+            logger.info(`[ClientManager] Connection established for ${numericApiId}`);
             clients.set(key, client);
             return client;
 
         } catch (error) {
-            logger.error(`[ClientManager] Connection failed for ${apiId}: ${error}`);
+            logger.error(`[ClientManager] Connection failed for ${numericApiId}: ${error}`);
             await gracefulDestroy(client);
             throw error;
         } finally {

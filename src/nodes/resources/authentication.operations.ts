@@ -25,7 +25,8 @@ export async function authenticationRouter(this: IExecuteFunctions, operation: s
 }
 
 async function requestCode(this: IExecuteFunctions) {
-    const apiId = this.getNodeParameter('apiId', 0) as number;
+    // This ensures the value is a Number type at runtime
+    const apiId = Number(this.getNodeParameter('apiId', 0));
     const apiHash = this.getNodeParameter('apiHash', 0) as string;
     const phoneNumber = this.getNodeParameter('phoneNumber', 0) as string;
 
@@ -56,7 +57,8 @@ async function requestCode(this: IExecuteFunctions) {
 }
 
 async function signIn(this: IExecuteFunctions) {
-    const apiId = this.getNodeParameter('apiId', 0) as number;
+    // This ensures the value is a Number type at runtime
+    const apiId = Number(this.getNodeParameter('apiId', 0));
     const apiHash = this.getNodeParameter('apiHash', 0) as string;
     const phoneNumber = this.getNodeParameter('phoneNumber', 0) as string;
     const phoneCode = this.getNodeParameter('phoneCode', 0) as string;
