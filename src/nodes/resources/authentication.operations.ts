@@ -3,18 +3,26 @@ import { TelegramClient, Api } from 'telegram';
 import { StringSession } from 'telegram/sessions';
 import { logger } from '../../core/logger';
 import { safeExecute } from '../../core/floodWaitHandler';
+import { LogLevel } from 'telegram/extensions/Logger';
 
 /**
- * HELPER: Forcefully destroys connection to prevent background timeouts
+ * HELPER: Forcefully destroys connection and kills background timers
  */
 async function forceCleanup(client: TelegramClient, phone: string) {
     if (!client) return;
     try {
+        // Silence logger during destruction to prevent noise
+        client.setLogLevel(LogLevel.NONE);
+        
+        // Disconnect creates a promise that resolves when socket closes
         await client.disconnect();
+        
+        // Destroy is crucial: it kills internal keep-alive timers that keep the node process "active"
         await client.destroy();
+        
         logger.info(`Cleanly disconnected auth client: ${phone}`);
     } catch (e) {
-        logger.warn(`Cleanup warning: ${e}`);
+        // We ignore errors here because we are destroying anyway
     }
 }
 
@@ -25,24 +33,25 @@ export async function authenticationRouter(this: IExecuteFunctions, operation: s
 }
 
 async function requestCode(this: IExecuteFunctions) {
-    // FIX 1: Parse Int explicitly to ensure it is a Number for GramJS
+    // Parse Int explicitly
     const rawApiId = this.getNodeParameter('apiId', 0);
     const apiId = parseInt(rawApiId as string, 10);
     
     const apiHash = this.getNodeParameter('apiHash', 0) as string;
     const phoneNumber = this.getNodeParameter('phoneNumber', 0) as string;
 
-    // FIX 2: Disable autoReconnect and reduce retries to prevent "stuck" workflows
     const client = new TelegramClient(new StringSession(''), apiId, apiHash, { 
         connectionRetries: 1,
         useWSS: false,
         autoReconnect: false 
     });
 
+    // Valid response placeholder
+    let responseData;
+
     try {
         await client.connect();
         
-        // Pass the numeric apiId explicitly to the SendCode object
         const result = await safeExecute(() => client.invoke(new Api.auth.SendCode({
             phoneNumber, 
             apiId, 
@@ -50,7 +59,8 @@ async function requestCode(this: IExecuteFunctions) {
             settings: new Api.CodeSettings({ allowAppHash: true })
         })));
 
-        return [[{
+        // Prepare data but DO NOT return yet
+        responseData = [[{
             json: {
                 success: true,
                 phoneCodeHash: result.phoneCodeHash,
@@ -58,20 +68,22 @@ async function requestCode(this: IExecuteFunctions) {
                 apiId, 
                 apiHash, 
                 phoneNumber,
-                note: "IMPORTANT: Check your phone for the verification code. You will need this code along with the phoneCodeHash and preAuthSession to complete the sign-in process."
+                note: "IMPORTANT: Check your phone for the verification code."
             }
         }]];
+
     } catch (error) {
-        // Log the actual error to help debugging
         logger.error(`RequestCode failed: ${error}`);
         throw error;
     } finally {
+        // Ensure cleanup happens BEFORE returning data to n8n
         await forceCleanup(client, phoneNumber);
     }
+    
+    return responseData;
 }
 
 async function signIn(this: IExecuteFunctions) {
-    // FIX 1: Parse Int explicitly
     const rawApiId = this.getNodeParameter('apiId', 0);
     const apiId = parseInt(rawApiId as string, 10);
 
@@ -82,12 +94,13 @@ async function signIn(this: IExecuteFunctions) {
     const preAuthSession = this.getNodeParameter('preAuthSession', 0) as string;
     const password2fa = this.getNodeParameter('password2fa', 0, '') as string;
 
-    // FIX 2: Disable autoReconnect to prevent infinite loops on casting errors
     const client = new TelegramClient(new StringSession(preAuthSession), apiId, apiHash, { 
         connectionRetries: 1,
         useWSS: false,
         autoReconnect: false
     });
+
+    let responseData;
 
     try {
         await client.connect();
@@ -103,7 +116,7 @@ async function signIn(this: IExecuteFunctions) {
             result = await safeExecute(() => client.invoke(new Api.auth.CheckPassword({ password: passwordHash })));
         }
 
-        return [[{
+        responseData = [[{
             json: {
                 success: true,
                 sessionString: client.session.save(),
@@ -115,10 +128,13 @@ async function signIn(this: IExecuteFunctions) {
                 note: "IMPORTANT: Copy this whole output and save it to a text file in your local PC for backup and use in GramPro Credentials."
             }
         }]];
+
     } catch (error) {
         logger.error(`SignIn failed: ${error}`);
         throw error;
     } finally {
         await forceCleanup(client, phoneNumber);
     }
+
+    return responseData;
 }
