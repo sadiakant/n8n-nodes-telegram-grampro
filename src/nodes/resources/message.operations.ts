@@ -240,17 +240,61 @@ async function forwardMessage(this: IExecuteFunctions, client: any) {
 
 async function getHistory(this: IExecuteFunctions, client: any) {
 
-	const chatId = this.getNodeParameter('chatId', 0);
+    // 1. Grab the input exactly as provided
+	const chatIdInput = this.getNodeParameter('chatId', 0) as string;
 	const mode = this.getNodeParameter('mode', 0, 'limit') as string;
 	const onlyMedia = this.getNodeParameter('onlyMedia', 0, false) as boolean;
 	const mediaTypes = this.getNodeParameter('mediaType', 0, []) as string[];
 
+    // --- NEW LOGIC: Fetch Name & Formatted ID ---
+    let sourceName = 'Unknown';
+    // Initialize with the input provided by the user
+    let formattedSourceId = chatIdInput; 
+
+    try {
+        // Fetch the actual entity to get Name and Type
+        const entity = await client.getEntity(chatIdInput);
+        
+        if (entity) {
+            // 1. Determine Source Name
+            if ('title' in entity && entity.title) {
+                sourceName = entity.title;
+            } else if ('firstName' in entity || 'lastName' in entity) {
+                sourceName = [entity.firstName, entity.lastName].filter(Boolean).join(' ');
+            } else if ('username' in entity && entity.username) {
+                sourceName = entity.username;
+            }
+
+            // 2. Determine Source ID (Format with -100 if Channel/Supergroup)
+            const rawId = entity.id ? entity.id.toString() : '';
+            if (rawId) {
+                // Check if it's a Channel or Supergroup (needs -100 prefix)
+                if (entity.className === 'Channel' || entity._ === 'channel') {
+                    formattedSourceId = `-100${rawId}`;
+                } 
+                // Check if it's a basic Group (needs - prefix)
+                else if (entity.className === 'Chat' || entity._ === 'chat') {
+                    formattedSourceId = `-${rawId}`;
+                } 
+                // Private users usually don't have prefixes
+                else {
+                    formattedSourceId = rawId;
+                }
+            }
+        }
+    } catch (error) {
+        // If entity fetch fails, we keep formattedSourceId = chatIdInput
+        // This ensures if you passed "-100..." manually, it stays that way.
+    }
+    // ------------------------------------
+
 	let messages: any[] = [];
 
+    // Use the input ID for the actual fetch
 	if (mode === 'limit') {
 		const limit = this.getNodeParameter('limit', 0, 10) as number;
 		messages = await safeExecute(() =>
-			client.getMessages(chatId, { limit }),
+			client.getMessages(chatIdInput, { limit }),
 		);
 	} else {
 		const maxMessages = this.getNodeParameter('maxMessages', 0, 500) as number;
@@ -263,7 +307,7 @@ async function getHistory(this: IExecuteFunctions, client: any) {
 			const hours = this.getNodeParameter('hours', 0, 24) as number;
 			const cutoffTime = Math.floor(Date.now() / 1000) - (hours * 3600);
 
-			for await (const msg of client.iterMessages(chatId, iterOptions)) {
+			for await (const msg of client.iterMessages(chatIdInput, iterOptions)) {
 				if (msg.date < cutoffTime) {
 					break;
 				}
@@ -276,7 +320,7 @@ async function getHistory(this: IExecuteFunctions, client: any) {
 			const fromTime = fromDateStr ? Math.floor(new Date(fromDateStr).getTime() / 1000) : 0;
 			const toTime = toDateStr ? Math.floor(new Date(toDateStr).getTime() / 1000) : Math.floor(Date.now() / 1000);
 
-			for await (const msg of client.iterMessages(chatId, iterOptions)) {
+			for await (const msg of client.iterMessages(chatIdInput, iterOptions)) {
 				if (msg.date > toTime) {
 					continue;
 				}
@@ -312,6 +356,10 @@ async function getHistory(this: IExecuteFunctions, client: any) {
 		items.push({
 			json: {
 				id: m.id,
+                sourceName: sourceName,
+                // This will now be "-100123456789"
+                sourceId: formattedSourceId, 
+                
 				text: m.message || '',
 				date: m.date,
 				humanDate: new Date(m.date * 1000).toISOString(),
