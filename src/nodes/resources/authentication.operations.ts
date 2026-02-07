@@ -25,20 +25,28 @@ export async function authenticationRouter(this: IExecuteFunctions, operation: s
 }
 
 async function requestCode(this: IExecuteFunctions) {
-    // This ensures the value is a Number type at runtime
-    const apiId = Number(this.getNodeParameter('apiId', 0));
+    // FIX 1: Parse Int explicitly to ensure it is a Number for GramJS
+    const rawApiId = this.getNodeParameter('apiId', 0);
+    const apiId = parseInt(rawApiId as string, 10);
+    
     const apiHash = this.getNodeParameter('apiHash', 0) as string;
     const phoneNumber = this.getNodeParameter('phoneNumber', 0) as string;
 
+    // FIX 2: Disable autoReconnect and reduce retries to prevent "stuck" workflows
     const client = new TelegramClient(new StringSession(''), apiId, apiHash, { 
-        connectionRetries: 5,
-        useWSS: false 
+        connectionRetries: 1,
+        useWSS: false,
+        autoReconnect: false 
     });
 
     try {
         await client.connect();
+        
+        // Pass the numeric apiId explicitly to the SendCode object
         const result = await safeExecute(() => client.invoke(new Api.auth.SendCode({
-            phoneNumber, apiId, apiHash,
+            phoneNumber, 
+            apiId, 
+            apiHash,
             settings: new Api.CodeSettings({ allowAppHash: true })
         })));
 
@@ -47,18 +55,26 @@ async function requestCode(this: IExecuteFunctions) {
                 success: true,
                 phoneCodeHash: result.phoneCodeHash,
                 preAuthSession: client.session.save(),
-                apiId, apiHash, phoneNumber,
+                apiId, 
+                apiHash, 
+                phoneNumber,
                 note: "IMPORTANT: Check your phone for the verification code. You will need this code along with the phoneCodeHash and preAuthSession to complete the sign-in process."
             }
         }]];
+    } catch (error) {
+        // Log the actual error to help debugging
+        logger.error(`RequestCode failed: ${error}`);
+        throw error;
     } finally {
         await forceCleanup(client, phoneNumber);
     }
 }
 
 async function signIn(this: IExecuteFunctions) {
-    // This ensures the value is a Number type at runtime
-    const apiId = Number(this.getNodeParameter('apiId', 0));
+    // FIX 1: Parse Int explicitly
+    const rawApiId = this.getNodeParameter('apiId', 0);
+    const apiId = parseInt(rawApiId as string, 10);
+
     const apiHash = this.getNodeParameter('apiHash', 0) as string;
     const phoneNumber = this.getNodeParameter('phoneNumber', 0) as string;
     const phoneCode = this.getNodeParameter('phoneCode', 0) as string;
@@ -66,9 +82,11 @@ async function signIn(this: IExecuteFunctions) {
     const preAuthSession = this.getNodeParameter('preAuthSession', 0) as string;
     const password2fa = this.getNodeParameter('password2fa', 0, '') as string;
 
+    // FIX 2: Disable autoReconnect to prevent infinite loops on casting errors
     const client = new TelegramClient(new StringSession(preAuthSession), apiId, apiHash, { 
-        connectionRetries: 5,
-        useWSS: false
+        connectionRetries: 1,
+        useWSS: false,
+        autoReconnect: false
     });
 
     try {
@@ -94,9 +112,12 @@ async function signIn(this: IExecuteFunctions) {
                 phoneNumber,
                 password2fa,
                 message: "Authentication successful. You can use this output to fill up new credentials to use all Telegram nodes.",
-                note: "IMPORTANT: Copy this whole output and save it to a text file in your local PC for backup and future use."
+                note: "IMPORTANT: Copy this whole output and save it to a text file in your local PC for backup and use in GramPro Credentials."
             }
         }]];
+    } catch (error) {
+        logger.error(`SignIn failed: ${error}`);
+        throw error;
     } finally {
         await forceCleanup(client, phoneNumber);
     }
