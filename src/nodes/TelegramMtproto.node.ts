@@ -67,6 +67,7 @@ export class TelegramMtproto implements INodeType {
 					{ name: 'Edit Message', value: 'editMessage' },    
 					{ name: 'Edit Message Media', value: 'editMessageMedia' },
 					{ name: 'Delete Message', value: 'deleteMessage' },
+					{ name: 'Delete History', value: 'deleteHistory', action: 'Delete all messages in a chat history' },
 					{ name: 'Pin Message', value: 'pinMessage' },
 					{ name: 'Unpin Message', value: 'unpinMessage' },
         			{ name: 'Send Poll', value: 'sendPoll' }, 
@@ -179,7 +180,7 @@ export class TelegramMtproto implements INodeType {
 				displayName: 'API ID',
 				name: 'apiId',
 				type: 'number',
-				default: '={{ $json.apiId }}', // Added default expression
+				default: '={{ $json.apiId }}', 
 				required: true,
 				displayOptions: {
 					show: {
@@ -192,7 +193,7 @@ export class TelegramMtproto implements INodeType {
 				displayName: 'API Hash',
 				name: 'apiHash',
 				type: 'string',
-				default: '={{ $json.apiHash }}', // Added default expression
+				default: '={{ $json.apiHash }}', 
 				required: true,
 				displayOptions: {
 					show: {
@@ -205,7 +206,7 @@ export class TelegramMtproto implements INodeType {
 				displayName: 'Phone Number',
 				name: 'phoneNumber',
 				type: 'string',
-				default: '={{ $json.phoneNumber }}', // Added default expression
+				default: '={{ $json.phoneNumber }}', 
 				required: true,
 				displayOptions: {
 					show: {
@@ -231,7 +232,7 @@ export class TelegramMtproto implements INodeType {
 				displayName: 'Phone Code Hash',
 				name: 'phoneCodeHash',
 				type: 'string',
-				default: '={{ $json.phoneCodeHash }}', // Added default expression
+				default: '={{ $json.phoneCodeHash }}', 
 				displayOptions: {
 					show: {
 						resource: ['authentication'],
@@ -244,7 +245,7 @@ export class TelegramMtproto implements INodeType {
 				displayName: 'Pre-Auth Session String',
 				name: 'preAuthSession',
 				type: 'string',
-				default: '={{ $json.preAuthSession }}', // Added default expression
+				default: '={{ $json.preAuthSession }}', 
 				displayOptions: {
 					show: {
 						resource: ['authentication'],
@@ -260,7 +261,7 @@ export class TelegramMtproto implements INodeType {
 				typeOptions: {
 					password: true,
 				},
-				default: '={{ $json.password2fa }}', // Added default expression
+				default: '={{ $json.password2fa }}', 
 				displayOptions: {
 					show: {
 						resource: ['authentication'],
@@ -636,15 +637,41 @@ export class TelegramMtproto implements INodeType {
 				required: true,
 				displayOptions: {
 					show: {
-						resource: ['message', 'chat'], // Ensure 'message' resource is included
+						resource: ['message', 'chat'], 
 						operation: [
 							'getHistory', 'editMessage', 
-							'deleteMessage', 'pinMessage', 'unpinMessage', 
+							'deleteMessage', 'deleteHistory', 'pinMessage', 'unpinMessage', 
 							'sendPoll', 'joinChat', 'leaveChat', 'joinGroup', 'leaveGroup'
 						],
 					},
                 },
 				description: 'Username (@channel), Invite Link (t.me/...), or numeric ID',
+			},
+			{
+				displayName: 'Max Message ID',
+				name: 'maxId',
+				type: 'number',
+				default: 0,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['deleteHistory'],
+					},
+				},
+				description: 'Maximum ID of message to delete. 0 to delete all messages.',
+			},
+			{
+				displayName: 'Delete for Everyone',
+				name: 'revoke',
+				type: 'boolean',
+				default: true,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['deleteHistory'],
+					},
+				},
+				description: 'Whether to delete the messages for everyone (true) or just for yourself (false).',
 			},
 			// --- POLL PROPERTIES ---
 			{
@@ -703,7 +730,7 @@ export class TelegramMtproto implements INodeType {
 				displayName: 'Anonymous Voting',
 				name: 'anonymous',
 				type: 'boolean',
-				default: true, // Default to true (Safe for Channels)
+				default: true, 
 				displayOptions: {
 					show: { resource: ['message'], operation: ['sendPoll'] },
 				},

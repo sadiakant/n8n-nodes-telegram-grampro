@@ -4,15 +4,6 @@ import { safeExecute } from '../../core/floodWaitHandler';
 import { withRateLimit } from '../../core/rateLimiter';
 import { Api } from 'telegram';
 import bigInt from 'big-integer';
-import { 
-  TelegramMessage, 
-  SendMessageOptions, 
-  EditMessageOptions, 
-  DeleteMessageOptions, 
-  PinMessageOptions,
-  CreatePollOptions,
-  EditMessageMediaOptions
-} from '../../types/telegram';
 
 export async function messageRouter(this: IExecuteFunctions, operation: string) {
 
@@ -25,18 +16,17 @@ export async function messageRouter(this: IExecuteFunctions, operation: string) 
 	);
 
 	switch (operation) {
-
 		case 'sendText':return sendText.call(this, client);
 		case 'forwardMessage': return forwardMessage.call(this, client);
 		case 'getHistory': return getHistory.call(this, client);
 		case 'editMessage': return editMessage.call(this, client);     
         case 'deleteMessage': return deleteMessage.call(this, client); 
+        case 'deleteHistory': return deleteHistory.call(this, client);
         case 'pinMessage': return pinMessage.call(this, client);    
 		case 'unpinMessage': return unpinMessage.call(this, client);
 		case 'sendPoll': return sendPoll.call(this, client);
 		case 'copyMessage': return copyMessage.call(this, client);
 		case 'editMessageMedia': return editMessageMedia.call(this, client);
-
 		default:
 			throw new Error(`Message operation not supported: ${operation}`);
 	}
@@ -48,11 +38,8 @@ async function editMessage(this: IExecuteFunctions, client: any) {
     const chatId = this.getNodeParameter('chatId', 0);
     const messageId = Number(this.getNodeParameter('messageId', 0));
     const text = this.getNodeParameter('text', 0);
-    
-    // IMPORTANT: Ensure this parameter exists in the UI properties
     const noWebpage = this.getNodeParameter('noWebpage', 0) as boolean;
 
-    // Use safeExecute once and pass all parameters
     const result = await safeExecute(() => 
         client.editMessage(chatId, { 
             message: messageId, 
@@ -75,7 +62,6 @@ async function editMessageMedia(this: IExecuteFunctions, client: any) {
     const chatId = this.getNodeParameter('chatId', 0) as string;
     const messageId = Number(this.getNodeParameter('messageId', 0));
     const media = this.getNodeParameter('media', 0);
-    
     const captionInput = this.getNodeParameter('caption', 0, '') as string;
     const captionEntitiesInput = this.getNodeParameter('captionEntities', 0, []) as any[];
     const parseMode = this.getNodeParameter('parseMode', 0, 'default') as string;
@@ -84,20 +70,15 @@ async function editMessageMedia(this: IExecuteFunctions, client: any) {
     let finalEntities = captionEntitiesInput;
     let debugInfo = "Using new caption";
 
-    // --- LOGIC: If Caption is Empty, Preserve Original ---
     if (!captionInput || captionInput.trim() === '') {
         try {
-            // We use getMessages. If this returns empty, it means the Message ID 
-            // does not exist in the Chat ID provided in the n8n node.
             const messages = await client.getMessages(chatId, { ids: [messageId] });
-            
             if (messages && messages.length > 0 && messages[0]) {
                 const msg = messages[0];
                 finalCaption = msg.message || "";
                 finalEntities = msg.entities || [];
                 debugInfo = "Successfully preserved original text";
             } else {
-                // This is the error you are seeing
                 debugInfo = `Error: Message ${messageId} not found in chat ${chatId}. Check your 'Chat ID' field!`;
             }
         } catch (error) {
@@ -105,7 +86,6 @@ async function editMessageMedia(this: IExecuteFunctions, client: any) {
         }
     }
 
-    // --- EXECUTION ---
     const result = await safeExecute(() => 
         client.editMessage(chatId, { 
             message: messageId, 
@@ -130,7 +110,7 @@ async function editMessageMedia(this: IExecuteFunctions, client: any) {
 async function deleteMessage(this: IExecuteFunctions, client: any) {
     const chatId = this.getNodeParameter('chatId', 0);
     const messageId = Number(this.getNodeParameter('messageId', 0));
-    const revoke = this.getNodeParameter('revoke', 0) as boolean; // Get toggle value
+    const revoke = this.getNodeParameter('revoke', 0) as boolean;
 
     await safeExecute(() => 
         client.deleteMessages(chatId, [messageId], { revoke })
@@ -139,10 +119,76 @@ async function deleteMessage(this: IExecuteFunctions, client: any) {
     return [[{ json: { success: true, deletedId: messageId, revoked: revoke } }]];
 }
 
+// --- UPDATED DELETE HISTORY FUNCTION ---
+async function deleteHistory(this: IExecuteFunctions, client: any) {
+    const chatId = this.getNodeParameter('chatId', 0) as string;
+    const maxId = this.getNodeParameter('maxId', 0) as number || 0;
+    const revoke = this.getNodeParameter('revoke', 0) as boolean;
+
+    try {
+        if (!client.connected) {
+            await client.connect();
+        }
+
+        const peer = await client.getInputEntity(chatId);
+        
+        // 1. GET TOTAL COUNT BEFORE DELETION
+        let preDeleteCount = 0;
+        try {
+            // 'limit: 0' fetches metadata (including total count) without fetching message bodies
+            const countResult = await client.getMessages(peer, { limit: 0 });
+            preDeleteCount = countResult.total || 0;
+        } catch (e) {
+            // If fetching count fails, we gracefully degrade to 0
+        }
+
+        let offset = 0;
+        let response;
+        let loopCount = 0;
+
+        // 2. PERFORM DELETION
+        do {
+            response = await client.invoke(
+                new Api.messages.DeleteHistory({
+                    peer: peer,
+                    maxId: maxId,
+                    revoke: revoke,
+                    justClear: false, 
+                })
+            );
+            
+            offset = response.offset;
+            loopCount++;
+
+            if (loopCount > 100) break; 
+            if (offset > 0) await new Promise(resolve => setTimeout(resolve, 100));
+
+        } while (offset > 0);
+
+        return [[{ 
+            json: { 
+                success: true, 
+                // Return the count we fetched before deletion
+                deletedCount: preDeleteCount, 
+                maxId: maxId, 
+                revoked: revoke,
+                iterations: loopCount
+            } 
+        }]];
+        
+    } catch (error) {
+        if (this.continueOnFail()) {
+            return [[{ json: { success: false, error: error.message } }]];
+        } else {
+            throw error;
+        }
+    }
+}
+
 async function pinMessage(this: IExecuteFunctions, client: any) {
     const chatId = this.getNodeParameter('chatId', 0);
     const messageId = Number(this.getNodeParameter('messageId', 0));
-    const notify = this.getNodeParameter('notify', 0) as boolean; // Get toggle value
+    const notify = this.getNodeParameter('notify', 0) as boolean;
 
     await safeExecute(() => 
         client.pinMessage(chatId, messageId, { notify })
@@ -154,25 +200,19 @@ async function pinMessage(this: IExecuteFunctions, client: any) {
 async function sendText(this: IExecuteFunctions, client: any) {
     const chatId = this.getNodeParameter('chatId', 0);
     const text = this.getNodeParameter('text', 0);
-    
-    // 1. Get the parameter (defaults to 0 if not provided)
     const replyTo = this.getNodeParameter('replyTo', 0) as number;
 
     const result = await withRateLimit(async () =>
         safeExecute(() =>
             client.sendMessage(chatId, { 
                 message: text,
-                // 2. Only add replyTo if a valid ID is provided
                 replyTo: replyTo > 0 ? replyTo : undefined,
             })
         )
     );
 
-    // Extract sender ID with comprehensive fallback for different message types
     let senderId: string | null = null;
-    
     if (result.fromId) {
-        // Try different possible properties for sender ID
         senderId = result.fromId.userId?.toString() || 
                    result.fromId.chatId?.toString() || 
                    result.fromId.channelId?.toString() ||
@@ -194,29 +234,22 @@ async function sendText(this: IExecuteFunctions, client: any) {
 }
 
 async function forwardMessage(this: IExecuteFunctions, client: any) {
-
     const fromChat = this.getNodeParameter('fromChatId', 0);
     const toChat = this.getNodeParameter('toChatId', 0);
     const messageId = Number(this.getNodeParameter('messageId', 0));
 
-    // Ensure IDs are resolved to entities
     const fromPeer = await client.getEntity(fromChat);
     const toPeer = await client.getEntity(toChat);
 
-    // FIXED: Changed 'id' to 'messages'
     const result = await client.forwardMessages(toPeer, {
         fromPeer: fromPeer,
         messages: [messageId], 
     });
 
-    // Handle array or single object response
     const msg = Array.isArray(result) ? result[0] : result;
 
-    // Extract sender ID with comprehensive fallback for different message types
     let senderId: string | null = null;
-    
     if (msg.fromId) {
-        // Try different possible properties for sender ID
         senderId = msg.fromId.userId?.toString() || 
                    msg.fromId.chatId?.toString() || 
                    msg.fromId.channelId?.toString() ||
@@ -239,24 +272,17 @@ async function forwardMessage(this: IExecuteFunctions, client: any) {
 }
 
 async function getHistory(this: IExecuteFunctions, client: any) {
-
-    // 1. Grab the input exactly as provided
 	const chatIdInput = this.getNodeParameter('chatId', 0) as string;
 	const mode = this.getNodeParameter('mode', 0, 'limit') as string;
 	const onlyMedia = this.getNodeParameter('onlyMedia', 0, false) as boolean;
 	const mediaTypes = this.getNodeParameter('mediaType', 0, []) as string[];
 
-    // --- NEW LOGIC: Fetch Name & Formatted ID ---
     let sourceName = 'Unknown';
-    // Initialize with the input provided by the user
     let formattedSourceId = chatIdInput; 
 
     try {
-        // Fetch the actual entity to get Name and Type
         const entity = await client.getEntity(chatIdInput);
-        
         if (entity) {
-            // 1. Determine Source Name
             if ('title' in entity && entity.title) {
                 sourceName = entity.title;
             } else if ('firstName' in entity || 'lastName' in entity) {
@@ -265,68 +291,41 @@ async function getHistory(this: IExecuteFunctions, client: any) {
                 sourceName = entity.username;
             }
 
-            // 2. Determine Source ID (Format with -100 if Channel/Supergroup)
             const rawId = entity.id ? entity.id.toString() : '';
             if (rawId) {
-                // Check if it's a Channel or Supergroup (needs -100 prefix)
-                if (entity.className === 'Channel' || entity._ === 'channel') {
-                    formattedSourceId = `-100${rawId}`;
-                } 
-                // Check if it's a basic Group (needs - prefix)
-                else if (entity.className === 'Chat' || entity._ === 'chat') {
-                    formattedSourceId = `-${rawId}`;
-                } 
-                // Private users usually don't have prefixes
-                else {
-                    formattedSourceId = rawId;
-                }
+                if (entity.className === 'Channel' || entity._ === 'channel') formattedSourceId = `-100${rawId}`;
+                else if (entity.className === 'Chat' || entity._ === 'chat') formattedSourceId = `-${rawId}`;
+                else formattedSourceId = rawId;
             }
         }
-    } catch (error) {
-        // If entity fetch fails, we keep formattedSourceId = chatIdInput
-        // This ensures if you passed "-100..." manually, it stays that way.
-    }
-    // ------------------------------------
+    } catch (error) {}
 
 	let messages: any[] = [];
 
-    // Use the input ID for the actual fetch
 	if (mode === 'limit') {
 		const limit = this.getNodeParameter('limit', 0, 10) as number;
-		messages = await safeExecute(() =>
-			client.getMessages(chatIdInput, { limit }),
-		);
+		messages = await safeExecute(() => client.getMessages(chatIdInput, { limit }));
 	} else {
 		const maxMessages = this.getNodeParameter('maxMessages', 0, 500) as number;
 		const iterOptions: Record<string, any> = {};
-		if (maxMessages > 0) {
-			iterOptions.limit = maxMessages;
-		}
+		if (maxMessages > 0) iterOptions.limit = maxMessages;
 
 		if (mode === 'hours') {
 			const hours = this.getNodeParameter('hours', 0, 24) as number;
 			const cutoffTime = Math.floor(Date.now() / 1000) - (hours * 3600);
-
 			for await (const msg of client.iterMessages(chatIdInput, iterOptions)) {
-				if (msg.date < cutoffTime) {
-					break;
-				}
+				if (msg.date < cutoffTime) break;
 				messages.push(msg);
 			}
 		} else if (mode === 'range') {
 			const fromDateStr = this.getNodeParameter('fromDate', 0, '') as string;
 			const toDateStr = this.getNodeParameter('toDate', 0, '') as string;
-
 			const fromTime = fromDateStr ? Math.floor(new Date(fromDateStr).getTime() / 1000) : 0;
 			const toTime = toDateStr ? Math.floor(new Date(toDateStr).getTime() / 1000) : Math.floor(Date.now() / 1000);
 
 			for await (const msg of client.iterMessages(chatIdInput, iterOptions)) {
-				if (msg.date > toTime) {
-					continue;
-				}
-				if (msg.date < fromTime) {
-					break;
-				}
+				if (msg.date > toTime) continue;
+				if (msg.date < fromTime) break;
 				messages.push(msg);
 			}
 		}
@@ -341,9 +340,7 @@ async function getHistory(this: IExecuteFunctions, client: any) {
 		const isVideo = !!m.media?.video || (isDocument && m.media.document?.mimeType?.includes('video'));
 		const hasMedia = isPhoto || isDocument || isVideo || !!m.media;
 
-		if (onlyMedia && !hasMedia) {
-			continue;
-		}
+		if (onlyMedia && !hasMedia) continue;
 
 		if (onlyMedia && mediaTypes.length > 0) {
 			let match = false;
@@ -357,17 +354,12 @@ async function getHistory(this: IExecuteFunctions, client: any) {
 			json: {
 				id: m.id,
                 sourceName: sourceName,
-                // This will now be "-100123456789"
                 sourceId: formattedSourceId, 
-                
 				text: m.message || '',
 				date: m.date,
 				humanDate: new Date(m.date * 1000).toISOString(),
 				fromId: m.fromId?.userId?.toString() || m.fromId?.toString() || null,
-				chatId: m.peerId?.userId?.toString() ||
-					m.peerId?.chatId?.toString() ||
-					m.peerId?.channelId?.toString() ||
-					m.peerId?.toString() || null,
+				chatId: m.peerId?.userId?.toString() || m.peerId?.chatId?.toString() || m.peerId?.channelId?.toString() || m.peerId?.toString() || null,
 				isReply: !!m.replyTo,
 				isOutgoing: m.out,
 				direction: m.out ? 'sent' : 'received',
@@ -402,11 +394,9 @@ async function sendPoll(this: IExecuteFunctions, client: any) {
     const isQuiz = this.getNodeParameter('isQuiz', 0) as boolean;
     const isAnonymous = this.getNodeParameter('anonymous', 0, true) as boolean;
 
-    // 1. Get the correct answer index if it's a quiz
     let correctAnswers: Buffer[] | undefined = undefined;
     if (isQuiz) {
         const correctIndex = this.getNodeParameter('correctAnswerIndex', 0) as number;
-        // The index must correspond to the 'option' buffer we create below
         correctAnswers = [Buffer.from(correctIndex.toString())];
     }
 
@@ -415,7 +405,7 @@ async function sendPoll(this: IExecuteFunctions, client: any) {
     const publicVoters = isBroadcastChannel ? false : !isAnonymous;
     const pollId = bigInt(Math.floor(Math.random() * 1000000000));
 
-    const result = await safeExecute(() => 
+    await safeExecute(() => 
         client.invoke(new Api.messages.SendMedia({
             peer: peer,
             media: new Api.InputMediaPoll({
@@ -434,7 +424,6 @@ async function sendPoll(this: IExecuteFunctions, client: any) {
                     multipleChoice: false,
                     quiz: isQuiz,
                 }),
-                // 2. CRITICAL: Pass the correct answers here (outside the Poll object)
                 correctAnswers: correctAnswers, 
             }),
             message: '', 
@@ -452,29 +441,17 @@ async function copyMessage(this: IExecuteFunctions, client: any) {
     const caption = this.getNodeParameter('caption', 0, '') as string;
     const disableLinkPreview = this.getNodeParameter('disableLinkPreview', 0, false) as boolean;
 
-    // Ensure IDs are resolved to entities
     const fromPeer = await client.getEntity(fromChat);
     const toPeer = await client.getEntity(toChat);
 
-    // Get the original message to copy its content
-    const messages = await safeExecute(() =>
-        client.getMessages(fromPeer, { ids: [messageId] })
-    );
+    const messages = await safeExecute(() => client.getMessages(fromPeer, { ids: [messageId] }));
 
     const originalMessage = messages[0];
-    if (!originalMessage) {
-        throw new Error('Original message not found');
-    }
+    if (!originalMessage) throw new Error('Original message not found');
 
-    // Prepare the message content for copying
     let messageContent = originalMessage.message || '';
-    
-    // If caption is provided, use it instead of original message
-    if (caption && caption.trim()) {
-        messageContent = caption;
-    }
+    if (caption && caption.trim()) messageContent = caption;
 
-    // Copy the message with media if present
     const result = await withRateLimit(async () =>
         safeExecute(() =>
             client.sendMessage(toPeer, {
@@ -486,11 +463,8 @@ async function copyMessage(this: IExecuteFunctions, client: any) {
         )
     );
 
-    // Extract sender ID with comprehensive fallback for different message types
     let senderId: string | null = null;
-    
     if (result.fromId) {
-        // Try different possible properties for sender ID
         senderId = result.fromId.userId?.toString() || 
                    result.fromId.chatId?.toString() || 
                    result.fromId.channelId?.toString() ||
@@ -499,7 +473,6 @@ async function copyMessage(this: IExecuteFunctions, client: any) {
                    result.fromId.channel_id?.toString();
     }
     
-    // If still null, try to get sender from the original message
     if (!senderId && originalMessage.fromId) {
         senderId = originalMessage.fromId.userId?.toString() || 
                    originalMessage.fromId.chatId?.toString() || 
@@ -509,13 +482,7 @@ async function copyMessage(this: IExecuteFunctions, client: any) {
                    originalMessage.fromId.channel_id?.toString();
     }
     
-    // For bot messages, try to get the bot's user ID from the message itself
-    if (!senderId && originalMessage.post_author) {
-        // Some bot messages have post_author field
-        senderId = originalMessage.post_author;
-    }
-    
-    // Final fallback: try to get from peer_id
+    if (!senderId && originalMessage.post_author) senderId = originalMessage.post_author;
     if (!senderId && originalMessage.peerId) {
         senderId = originalMessage.peerId.userId?.toString() || 
                    originalMessage.peerId.chatId?.toString() || 
