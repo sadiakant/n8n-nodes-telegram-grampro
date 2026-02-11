@@ -20,7 +20,9 @@
     "telegram-grampro",
     "gramjs",
     "automation",
-    "workflow"
+    "workflow",
+    "n8n-community-node-package"
+
   ],
   "author": {
     "name": "sadiakant",
