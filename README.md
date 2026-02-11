@@ -1,6 +1,8 @@
+![Telegram GramPro Banner](https://repository-images.githubusercontent.com/1144534294/b1b16f9e-45da-43df-9ea7-0ff053a199ca)
+
 # Telegram GramPro - n8n Integration
 
-**Powerful Telegram automation for n8n workflows with session encryption and rate limiting**
+**Powerful Telegram automation for n8n workflows with enterprise-grade security, performance optimization, and comprehensive error handling**
 
 [![Build Status](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/build.yml/badge.svg)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/build.yml)
 [![Publish Status](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/publish.yml/badge.svg)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/publish.yml)
@@ -25,11 +27,20 @@ Telegram GramPro is a comprehensive n8n custom node that brings the full power o
 - **Channels**: Get participants, manage members, ban/promote users
 
 #### **Enterprise Security & Performance**
-- 🔐 **AES-256-GCM Session Encryption** - Military-grade security
-- ⚡ **Smart Rate Limiting** - Prevents API limits with intelligent queuing
-- 🛡️ **Enhanced Error Handling** - Automatic retry for flood waits and timeouts
-- 🔗 **Connection Management** - WebSocket support with automatic cleanup
-- 📊 **Structured Logging** - Production-ready logging with debug support
+- 🔐 **AES-256-GCM Session Encryption** - Military-grade security with automatic key derivation
+- ⚡ **Smart Rate Limiting** - Prevents API limits with intelligent queuing and priority handling
+- 🛡️ **Enhanced Error Handling** - Automatic retry for flood waits, timeouts, and connection issues
+- 🔗 **Connection Management** - Advanced client pooling with health checks and auto-reconnection
+- 📊 **Structured Logging** - Production-ready logging with configurable levels and context
+- 🧠 **Smart Caching** - In-memory caching for frequently accessed data with TTL management
+- 🎯 **Input Validation** - Comprehensive validation with detailed error messages and warnings
+
+#### **New Advanced Features**
+- **Copy Restricted Content** - Handle media that cannot be forwarded normally
+- **Edit Message Media** - Update media content in existing messages with caption support
+- **Enhanced Authentication** - Improved session management with better error handling
+- **Memory Optimization** - Automatic cleanup and resource management
+- **Performance Monitoring** - Built-in metrics and queue monitoring
 
 ## 📦 Installation
 
@@ -96,7 +107,7 @@ For detailed documentation of all operations with parameters, examples, and use 
 | Resource | Operations |
 |----------|------------|
 | **Session Generator** | Request Code, Sign In & Generate |
-| **Message** | Send Text, Get Messages, Edit, Delete, Pin, Forward, Copy, Edit Media, Create Poll |
+| **Message** | Send Text, Get Messages, Edit, Delete, Pin, Forward, Copy, Edit Media, Create Poll, Copy Restricted Content |
 | **Chat** | Get Chat, Get Dialogs, Join Channel/Group, Leave Channel/Group, Create Group/Channel |
 | **User** | Get User Info, Get Full User Details, Update Profile, Change Username, Get Profile Photo |
 | **Media** | Download Media Files |
@@ -106,12 +117,21 @@ For detailed documentation of all operations with parameters, examples, and use 
 
 ### **Session Encryption**
 All session strings are automatically encrypted using AES-256-GCM with:
-- 256-bit encryption keys
-- 128-bit initialization vectors
-- PBKDF2 key derivation with salt
-- Authentication tags for integrity
+- 256-bit encryption keys derived from your API credentials
+- 128-bit initialization vectors with PBKDF2 key derivation
+- Authentication tags for integrity verification
+- Automatic encryption/decryption transparent to users
+- Secure storage prevents session exposure
 
-### **Error Handling**
+### **Input Validation**
+Comprehensive validation ensures data integrity and security:
+- API credentials validation (ID format, Hash length)
+- Phone number format validation (international format)
+- Session string validation and integrity checks
+- Operation-specific parameter validation
+- Real-time warnings for potential issues
+
+### **Enhanced Error Handling**
 The node handles common Telegram errors gracefully:
 
 - **FLOOD_WAIT**: Automatic retry with specified wait time
@@ -119,46 +139,52 @@ The node handles common Telegram errors gracefully:
 - **SESSION_REVOKED**: Guidance to re-authenticate
 - **USER_DEACTIVATED_BAN**: Account ban detection
 - **PEER_FLOOD**: Extended wait times for peer flooding
-- **NETWORK_TIMEOUT**: Exponential backoff retries
+- **NETWORK_TIMEOUT**: Exponential backoff retries (up to 5 attempts)
 - **CHAT_WRITE_FORBIDDEN**: Permission error handling
 - **USER_BANNED_IN_CHANNEL**: Channel ban detection
+- **INPUT_USER_DEACTIVATED**: Deactivated user handling
 
-### **Rate Limiting**
-Prevents hitting Telegram's API rate limits:
-- Minimum 1-second interval between requests (configurable)
-- Request queuing with priority support
-- Queue length monitoring
-- Automatic cleanup
-
-## 📊 Performance Optimized
+## ⚡ Performance Optimizations
 
 ### **Smart Client Management**
-- Automatic connection validation
-- Health checks and reconnection
-- Resource cleanup and management
-- WebSocket support for reliability
+- **Connection Pooling**: Reuses existing TelegramClient instances via Map cache
+- **Race Condition Prevention**: Connection locks prevent multiple simultaneous connections
+- **Health Monitoring**: Automatic connection validation and healing
+- **Auto-cleanup**: 30-minute stale connection detection and cleanup
+- **Reconnection Logic**: Automatic reconnection for failed connections
+- **Session Encryption**: Transparent AES-256-GCM session decryption
 
-### **Request Queuing**
-- Priority-based request handling
-- Queue length monitoring
-- Automatic cleanup
-- Configurable intervals
+### **Intelligent Rate Limiting**
+- Configurable request intervals (minimum 1-second)
+- Priority-based request queuing with queue length monitoring
+- DoS protection with maximum queue size limits (1000 requests)
+- Automatic cleanup of stale requests
+- Enhanced Telegram API limit compliance
 
-### **Memory Efficient**
+### **Smart Caching**
+In-memory caching for frequently accessed data:
+- User information caching (5-minute TTL)
+- Chat/channel metadata caching
+- Dialog lists caching
+- Automatic cache cleanup and size management
+- Configurable cache TTL and maximum size
+
+### **Memory Efficient Design**
 - Proper cleanup prevents memory leaks
-- Connection pooling
-- Resource management
+- Connection pooling and resource management
 - Background loop prevention
+- Optimized data structures and algorithms
+- Automatic resource cleanup
+
+### **Enhanced Request Handling**
+- **Binary File Upload**: Support for photos, videos, documents with automatic format detection
+- **Media URL Support**: Direct URL upload with fallback to download-and-upload
+- **Progress Tracking**: Real-time download progress for large media files
+- **Error Recovery**: Automatic retry for network timeouts and connection issues
 
 ## 🚨 Troubleshooting
 
 For comprehensive troubleshooting guidance, common issues, and solutions, see our [Troubleshooting Guide](TROUBLESHOOTING_GUIDE.md).
-
-## Logging
-
-Set a lower log level to reduce terminal noise:
-- `GRAMPRO_LOG_LEVEL=error|warn|info|debug`
-- `N8N_LOG_LEVEL=error|warn|info|debug` (used if `GRAMPRO_LOG_LEVEL` is not set)
 
 ## 🎨 Workflow Examples
 
@@ -196,6 +222,38 @@ Set a lower log level to reduce terminal noise:
 5. Telegram GramPro (Notify Admins)
 6. Success/Failure handling
 ```
+
+### **Advanced Media Handling Workflow**
+```
+1. Trigger (New Media Message)
+2. Telegram GramPro (Copy Restricted Content)
+   ├── Source Chat: @restricted_channel
+   ├── Message ID: {{ $json.messageId }}
+   └── Target Chat: @your_channel
+3. Telegram GramPro (Edit Message Media)
+   ├── New Media: {{ $json.processedMedia }}
+   └── Caption: "Enhanced content"
+4. Success/Failure handling
+```
+
+## 🔧 Advanced Configuration
+
+### **Environment Variables**
+- `GRAMPRO_LOG_LEVEL=error|warn|info|debug` - Control log verbosity
+- `N8N_LOG_LEVEL=error|warn|info|debug` - Fallback if GRAMPRO_LOG_LEVEL not set
+
+### **Performance Tuning**
+- **Rate Limiting**: Adjust intervals based on your usage patterns
+- **Cache Size**: Configure maximum cache entries for your memory constraints
+- **Connection Timeout**: Set appropriate timeouts for your network conditions
+- **Retry Attempts**: Configure retry logic for your reliability requirements
+
+### **Security Best Practices**
+- Always use encrypted session strings
+- Keep API credentials secure and never expose them in workflow outputs
+- Enable 2FA for your Telegram account
+- Regularly rotate session strings
+- Monitor logs for security events
 
 ## 🤝 Contributing
 
@@ -266,7 +324,35 @@ MIT License - see LICENSE file for details.
   <span style="background: #ffc107; color: black; padding: 4px 8px; border-radius: 4px; font-size: 12px;">MTProto</span>
   <span style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">WebSocket</span>
   <span style="background: #20c997; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">AES-256</span>
+  <span style="background: #6c757d; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Rate Limiting</span>
+  <span style="background: #e83e8c; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Caching</span>
+  <span style="background: #fd7e14; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Validation</span>
 </div>
+
+### **Recent Major Improvements**
+
+#### **Performance & Reliability Enhancements**
+- **Advanced Client Management**: Implemented connection pooling with automatic health checks and reconnection logic
+- **Smart Rate Limiting**: Added priority-based queuing with configurable intervals and DoS protection
+- **Memory Optimization**: Automatic cleanup prevents memory leaks with proper resource management
+- **Enhanced Error Recovery**: Exponential backoff retries for network timeouts and connection issues
+
+#### **Security & Data Protection**
+- **AES-256-GCM Encryption**: Military-grade session encryption with automatic key derivation from API credentials
+- **Comprehensive Input Validation**: Multi-layered validation with detailed error messages and security warnings
+- **Session Management**: Secure session handling with integrity checks and automatic cleanup
+
+#### **New Advanced Features**
+- **Copy Restricted Content**: Handle media that cannot be forwarded normally with download-and-upload fallback
+- **Edit Message Media**: Update media content in existing messages with caption and formatting support
+- **Enhanced Authentication**: Improved session generation with better error handling and validation
+- **Smart Caching**: In-memory caching for frequently accessed data with TTL management
+
+#### **Developer Experience**
+- **Structured Logging**: Configurable log levels with context-rich messages for debugging
+- **Comprehensive Documentation**: Updated guides with new features and troubleshooting
+- **Type Safety**: Full TypeScript implementation with comprehensive type definitions
+- **Error Handling**: Detailed error messages with actionable guidance
 
 ### **Collaboration Excellence**
 
@@ -274,7 +360,14 @@ MIT License - see LICENSE file for details.
 - **<span style="color: #28a745;">✅ Quality Assurance</span>**: Multi-layered review process ensuring code quality and security
 - **<span style="color: #6f42c1;">🚀 Innovation</span>**: Latest technologies and best practices implementation
 - **<span style="color: #ffc107;">🔧 Expert Integration</span>**: Professional-grade code integration and deployment
+- **<span style="color: #dc3545;">⚡ Performance Focus</span>**: Enterprise-grade performance optimization and monitoring
+- **<span style="color: #20c997;">🛡️ Security First</span>**: Military-grade security with comprehensive validation
+- **<span style="color: #6c757d;">📊 Production Ready</span>**: Built for enterprise environments with monitoring and logging
+
 ---
 
 **Built with ❤️ for n8n automation workflows**
 
+**Version**: 2.0.0 - Enterprise Edition
+**Status**: Production Ready
+**Last Updated**: February 2026

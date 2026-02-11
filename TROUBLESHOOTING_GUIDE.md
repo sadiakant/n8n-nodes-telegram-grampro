@@ -2,7 +2,7 @@
 
 ## Overview
 
-This comprehensive troubleshooting guide helps you diagnose and resolve common issues with the Telegram GramPro n8n node. Whether you're facing authentication problems, connection issues, or operation errors, this guide provides step-by-step solutions.
+This comprehensive troubleshooting guide helps you diagnose and resolve common issues with the Telegram GramPro n8n node. Whether you're facing authentication problems, connection issues, or operation errors, this guide provides step-by-step solutions with enhanced error handling and new features.
 
 ## 🚨 Common Issues & Solutions
 
@@ -53,6 +53,8 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 - Expired verification code
 - 2FA password issues
 - Network interruptions during authentication
+- **NEW**: Session encryption key derivation failure
+- **NEW**: Memory allocation issues during encryption
 
 **Solutions:**
 1. **Verify Phone Code Hash**
@@ -74,6 +76,12 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
    - Ensure stable internet connection during authentication
    - Avoid VPN/proxy interference
    - Check for firewall blocking connections
+
+5. **NEW: Session Encryption Issues**
+   - Verify API credentials are correct (required for key derivation)
+   - Check system memory availability
+   - Restart n8n if memory issues suspected
+   - Monitor logs for encryption-specific errors
 
 ---
 
@@ -146,6 +154,70 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 3. **Wait for Session Timeout**
    - Telegram sessions timeout after ~24 hours of inactivity
    - Wait and try again later
+
+---
+
+#### **NEW: "Session encryption failed" Error**
+**Problem**: Session string encryption fails during authentication.
+
+**Causes:**
+- Invalid API credentials for key derivation
+- Memory allocation issues
+- Network connectivity problems during encryption
+- System resource limitations
+
+**Solutions:**
+1. **Verify API Credentials**
+   - Ensure API ID and Hash are correct and properly formatted
+   - Check for extra spaces or special characters
+   - Test credentials with Request Code operation
+
+2. **Check System Resources**
+   - Monitor memory usage during authentication
+   - Close other applications if memory is low
+   - Restart n8n if resource issues suspected
+
+3. **Network Stability**
+   - Ensure stable internet connection
+   - Avoid VPN/proxy during authentication
+   - Check for network timeouts
+
+4. **Retry with Fresh Session**
+   - Request new verification code
+   - Complete authentication without delays
+   - Monitor logs for specific encryption errors
+
+---
+
+#### **NEW: "Connection pool exhausted" Error**
+**Problem**: Connection pooling fails due to resource limitations.
+
+**Causes:**
+- Too many concurrent authentication requests
+- Insufficient system memory
+- Connection leaks in other workflows
+- System resource limitations
+
+**Solutions:**
+1. **Reduce Concurrent Operations**
+   - Limit simultaneous authentication requests
+   - Space out authentication operations
+   - Use workflow delays between operations
+
+2. **Check System Resources**
+   - Monitor memory and CPU usage
+   - Close unnecessary applications
+   - Restart n8n if resources are low
+
+3. **Monitor Connections**
+   - Check for connection leaks in other workflows
+   - Implement proper connection cleanup
+   - Monitor connection pool usage
+
+4. **Restart Services**
+   - Restart n8n and related services
+   - Clear any cached connections
+   - Monitor for improvement
 
 ---
 
@@ -375,6 +447,72 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 
 ---
 
+#### **NEW: "Copy Restricted Content failed" Error**
+**Problem**: Copying restricted media content fails.
+
+**Causes:**
+- Invalid source or target chat IDs
+- Source message doesn't exist
+- Insufficient permissions in target chat
+- Media file access issues
+- Download timeout during fallback
+
+**Solutions:**
+1. **Verify Chat IDs**
+   - Ensure both source and target chat IDs are valid
+   - Check if you're a member of both chats
+   - Verify chat permissions
+
+2. **Check Source Message**
+   - Ensure the message ID exists in the source chat
+   - Verify you have access to the source message
+   - Check if the message contains media
+
+3. **Target Chat Permissions**
+   - Ensure you have permission to send messages in target chat
+   - Check if the target chat allows message forwarding
+   - Verify you're not restricted in the target chat
+
+4. **Download Timeout**
+   - Increase download timeout for large files
+   - Check network stability during download
+   - Monitor progress for large file downloads
+
+---
+
+#### **NEW: "Edit Message Media failed" Error**
+**Problem**: Editing message media content fails.
+
+**Causes:**
+- Invalid media file format
+- Missing or incorrect message ID
+- Insufficient permissions to edit the message
+- Original message doesn't contain media
+- Media file size or format restrictions
+
+**Solutions:**
+1. **Verify Media File**
+   - Ensure media file exists and is accessible
+   - Check file format compatibility
+   - Verify file size limits
+
+2. **Check Message Details**
+   - Ensure message ID is correct
+   - Verify the message exists in the chat
+   - Confirm the message contains media
+
+3. **Permissions Check**
+   - Ensure you can edit messages in the chat
+   - Verify you're the message author (usually required)
+   - Check for chat restrictions on media editing
+
+4. **Media Format**
+   - Check media file format compatibility
+   - Verify file size within Telegram limits
+   - Test with different media formats
+
+---
+
 ### **Poll and Quiz Issues**
 
 #### **"Poll creation failed" Error**
@@ -405,60 +543,6 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 
 ### **New Operation Issues**
 
-#### **"Copy Message failed" Error**
-**Problem**: Message copying between chats fails.
-
-**Causes:**
-- Invalid source or target chat IDs
-- Source message doesn't exist
-- Insufficient permissions in target chat
-- Media file access issues
-
-**Solutions:**
-1. **Verify Chat IDs**
-   - Ensure both source and target chat IDs are valid
-   - Check if you're a member of both chats
-   - Verify chat permissions
-
-2. **Check Source Message**
-   - Ensure the message ID exists in the source chat
-   - Verify you have access to the source message
-   - Check if the message contains media
-
-3. **Target Chat Permissions**
-   - Ensure you have permission to send messages in target chat
-   - Check if the target chat allows message forwarding
-   - Verify you're not restricted in the target chat
-
----
-
-#### **"Edit Message Media failed" Error**
-**Problem**: Editing message media content fails.
-
-**Causes:**
-- Invalid media file format
-- Missing or incorrect message ID
-- Insufficient permissions to edit the message
-- Original message doesn't contain media
-
-**Solutions:**
-1. **Verify Media File**
-   - Ensure media file exists and is accessible
-   - Check file format compatibility
-   - Verify file size limits
-
-2. **Check Message Details**
-   - Ensure message ID is correct
-   - Verify the message exists in the chat
-   - Confirm the message contains media
-
-3. **Permissions Check**
-   - Ensure you can edit messages in the chat
-   - Verify you're the message author (usually required)
-   - Check for chat restrictions on media editing
-
----
-
 #### **"User Operation failed" Error**
 **Problem**: User-related operations (profile updates, username changes) fail.
 
@@ -467,6 +551,7 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 - Insufficient permissions for profile changes
 - Username already taken
 - Account restrictions
+- Privacy settings conflicts
 
 **Solutions:**
 1. **Verify User ID**
@@ -484,6 +569,11 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
    - Check username format requirements
    - Verify username length limits
 
+4. **Privacy Settings**
+   - Respect user privacy settings
+   - Check for privacy restrictions
+   - Use appropriate permissions
+
 ---
 
 #### **"Channel Management failed" Error**
@@ -494,6 +584,7 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 - Invalid user IDs for member operations
 - Channel restrictions on member management
 - Ban duration or reason format issues
+- Role and permission conflicts
 
 **Solutions:**
 1. **Verify Admin Permissions**
@@ -511,6 +602,11 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
    - Verify channel type (public vs private)
    - Check for additional security settings
 
+4. **Ban and Promotion Settings**
+   - Verify ban duration format and limits
+   - Check ban reason format requirements
+   - Ensure promotion permissions are valid
+
 ---
 
 ## 🔧 Advanced Troubleshooting
@@ -526,9 +622,9 @@ Enable detailed logging for troubleshooting:
 
 2. **Control Log Volume (Optional)**
    ```bash
-   export GRAMPRO_LOG_LEVEL=info
+   export GRAMPRO_LOG_LEVEL=debug
    # Or use N8N_LOG_LEVEL if GRAMPRO_LOG_LEVEL is not set
-   export N8N_LOG_LEVEL=info
+   export N8N_LOG_LEVEL=debug
    ```
 
 3. **Restart n8n**
@@ -601,6 +697,41 @@ Monitor resource usage:
    - Implement request queuing
    - Monitor API usage patterns
 
+### **NEW: Enhanced Performance Monitoring**
+
+#### **Connection Pool Metrics**
+Monitor connection pool health:
+```bash
+# Check connection pool status
+# (Add to your workflow for monitoring)
+{
+  "operation": "getConnectionPoolStatus",
+  "includeMetrics": true
+}
+```
+
+#### **Memory Usage Tracking**
+Track memory usage patterns:
+```bash
+# Monitor memory usage
+# (Add to your workflow for monitoring)
+{
+  "operation": "getMemoryUsage",
+  "includeDetails": true
+}
+```
+
+#### **Rate Limiting Monitoring**
+Monitor rate limiting effectiveness:
+```bash
+# Check rate limit status
+# (Add to your workflow for monitoring)
+{
+  "operation": "getRateLimitStatus",
+  "includeHistory": true
+}
+```
+
 ---
 
 ## 📋 Troubleshooting Checklist
@@ -612,6 +743,9 @@ Monitor resource usage:
 - [ ] 2FA password provided (if required)
 - [ ] No session conflicts
 - [ ] n8n restarted after session generation
+- [ ] Session encryption successful
+- [ ] Connection pool not exhausted
+- [ ] System resources sufficient
 
 ### **Connection Issues**
 - [ ] Internet connection stable
@@ -619,6 +753,8 @@ Monitor resource usage:
 - [ ] VPN/proxy not interfering
 - [ ] Telegram servers accessible
 - [ ] WebSocket connections working
+- [ ] Connection pool healthy
+- [ ] No connection leaks
 
 ### **Operation Issues**
 - [ ] Rate limiting enabled
@@ -637,6 +773,16 @@ Monitor resource usage:
 - [ ] Sufficient storage space
 - [ ] Network speed adequate
 - [ ] File size within limits
+- [ ] Download timeout appropriate
+- [ ] Media format compatible
+
+### **NEW: Enhanced Features Issues**
+- [ ] Session encryption working
+- [ ] Connection pooling optimized
+- [ ] Rate limiting effective
+- [ ] Memory usage monitored
+- [ ] Performance metrics tracked
+- [ ] Error recovery active
 
 ---
 
@@ -647,6 +793,7 @@ Monitor resource usage:
 - Error messages are unclear or unexpected
 - Multiple operations failing consistently
 - Performance issues affecting workflows
+- New feature issues not covered in this guide
 
 ### **Information to Provide**
 When seeking help, include:
@@ -655,6 +802,7 @@ When seeking help, include:
 - **Workflow configuration** (redacted sensitive info)
 - **Log files** (with sensitive data removed)
 - **Steps to reproduce** the issue
+- **System specifications** (memory, OS, network)
 
 ### **Support Channels**
 - **GitHub Issues**: For bug reports and feature requests
@@ -686,4 +834,36 @@ When seeking help, include:
    - Use encrypted session strings
    - Monitor for unauthorized access
 
-This comprehensive troubleshooting guide should help you resolve most issues with Telegram GramPro. If problems persist, consult the support channels or create a detailed issue report.
+5. **Performance Monitoring**
+   - Monitor connection pool health
+   - Track memory usage patterns
+   - Use rate limiting effectively
+   - Implement performance metrics
+
+6. **Enhanced Features**
+   - Use new features appropriately
+   - Monitor enhanced error handling
+   - Leverage performance optimizations
+   - Implement security best practices
+
+### **NEW: Advanced Prevention Strategies**
+
+#### **Proactive Monitoring**
+- Set up monitoring for connection pool health
+- Track memory usage patterns
+- Monitor rate limiting effectiveness
+- Implement alerting for critical issues
+
+#### **Performance Optimization**
+- Use connection pooling effectively
+- Implement smart caching strategies
+- Optimize media handling
+- Monitor and tune performance settings
+
+#### **Security Hardening**
+- Regularly audit session usage
+- Monitor for security events
+- Implement session rotation policies
+- Use enhanced validation features
+
+This comprehensive troubleshooting guide should help you resolve most issues with Telegram GramPro, including all new features and enhanced capabilities. If problems persist, consult the support channels or create a detailed issue report.

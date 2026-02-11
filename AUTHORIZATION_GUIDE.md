@@ -191,6 +191,8 @@ The updated authentication system now provides additional information in the ses
 2. **Session Validation**: Better validation of session strings before use
 3. **Connection Management**: Improved connection cleanup and management
 4. **2FA Support**: Enhanced support for accounts with two-factor authentication
+5. **Security Enhancements**: Automatic session encryption with AES-256-GCM
+6. **Performance Optimization**: Faster authentication with reduced connection overhead
 
 ### Troubleshooting New Features
 
@@ -210,6 +212,22 @@ To prevent connection timeout errors:
 3. **Monitor Logs**: Check n8n logs for connection status
 4. **Use Stable Network**: Avoid VPN/proxy during authentication
 
+#### **"Session encryption failed" Error**
+If session encryption fails:
+
+1. **Verify API Credentials**: Ensure API ID and Hash are correct
+2. **Check Session Format**: Session string should be properly formatted
+3. **Network Issues**: Check for network connectivity problems
+4. **Memory Issues**: Ensure sufficient memory for encryption operations
+
+#### **"Connection pool exhausted" Error**
+If connection pooling fails:
+
+1. **Reduce Concurrent Operations**: Limit simultaneous authentication requests
+2. **Check System Resources**: Ensure sufficient memory and CPU
+3. **Monitor Connections**: Check for connection leaks in other workflows
+4. **Restart Services**: Restart n8n and related services
+
 ## Integration with Other Nodes
 
 The generated `sessionString` can be used directly with:
@@ -219,10 +237,48 @@ The generated `sessionString` can be used directly with:
 
 ## Security Features
 
-- **Secure password handling**: 2FA passwords are handled securely
-- **Session encryption**: Generated sessions are compatible with the encryption system
-- **Temporary connections**: No persistent connections are maintained
-- **Proper cleanup**: All resources are properly cleaned up after use
+### **AES-256-GCM Session Encryption**
+- **Automatic Encryption**: Session strings are automatically encrypted using AES-256-GCM
+- **Key Derivation**: Encryption keys are derived from your API credentials using PBKDF2
+- **Authentication Tags**: Integrity verification with authentication tags
+- **Secure Storage**: Encrypted sessions prevent unauthorized access
+
+### **Enhanced Input Validation**
+- **API Credentials**: Validates API ID format and Hash length
+- **Phone Number**: Validates international format and length
+- **Session String**: Validates format and integrity
+- **2FA Password**: Validates format and security requirements
+
+### **Connection Security**
+- **Secure Password Handling**: 2FA passwords are handled securely
+- **Session Encryption**: Generated sessions are compatible with the encryption system
+- **Temporary Connections**: No persistent connections are maintained
+- **Proper Cleanup**: All resources are properly cleaned up after use
+
+### **Memory Management**
+- **Automatic Cleanup**: Connection pools are automatically cleaned up
+- **Resource Management**: Proper resource allocation and deallocation
+- **Memory Optimization**: Prevents memory leaks and excessive usage
+- **Background Processing**: Non-blocking operations for better performance
+
+## Advanced Configuration
+
+### **Environment Variables**
+- `GRAMPRO_LOG_LEVEL=debug` - Enable detailed authentication logging
+- `N8N_LOG_LEVEL=debug` - Fallback for authentication logs
+
+### **Performance Tuning**
+- **Connection Timeout**: Configure authentication timeout settings
+- **Retry Logic**: Set retry attempts for failed authentications
+- **Memory Limits**: Configure memory limits for encryption operations
+- **Network Settings**: Optimize network settings for authentication
+
+### **Security Best Practices**
+1. **Secure Storage**: Always store session strings securely
+2. **Regular Rotation**: Rotate session strings periodically
+3. **Monitor Usage**: Monitor authentication attempts and usage
+4. **Backup Strategy**: Maintain secure backups of session strings
+5. **Access Control**: Limit access to authentication credentials
 
 ## Troubleshooting
 
@@ -234,6 +290,8 @@ The generated `sessionString` can be used directly with:
 4. **"2FA password required"**: Enter your 2FA password in the password2fa field
 5. **"Session already in use"**: Disconnect other Telegram clients or wait for session timeout
 6. **"Ghost Connection timeout"**: Restart your n8n instance after receiving the session string
+7. **"Session encryption failed"**: Check API credentials and network connectivity
+8. **"Connection pool exhausted"**: Reduce concurrent operations and check system resources
 
 ### Best Practices
 
@@ -244,6 +302,9 @@ The generated `sessionString` can be used directly with:
 5. **Act quickly**: Complete the authentication process within 10-15 minutes to avoid code expiration
 6. **Use fresh codes**: Always request a new verification code if the previous one expired
 7. **Restart n8n**: Always restart n8n after session string generation to prevent connection issues
+8. **Monitor Performance**: Watch for authentication performance and adjust settings as needed
+9. **Security First**: Always prioritize security over convenience
+10. **Regular Maintenance**: Periodically review and update authentication settings
 
 ## Example Complete Workflow
 
@@ -265,4 +326,28 @@ The generated `sessionString` can be used directly with:
    └── Output: Telegram operations
 ```
 
-This guide provides a complete authentication solution for integrating Telegram into your n8n workflows with proper session management and error handling.
+## Advanced Authentication Scenarios
+
+### **Multiple Account Management**
+For managing multiple Telegram accounts:
+1. Generate separate session strings for each account
+2. Use different credential sets in n8n
+3. Monitor session usage across accounts
+4. Implement session rotation for security
+
+### **High-Volume Authentication**
+For applications requiring frequent authentication:
+1. Implement connection pooling
+2. Use session caching where appropriate
+3. Monitor authentication performance
+4. Optimize network settings
+
+### **Enterprise Security**
+For enterprise environments:
+1. Implement session encryption at rest
+2. Use secure credential storage
+3. Monitor authentication logs
+4. Implement audit trails
+5. Regular security assessments
+
+This guide provides a complete authentication solution for integrating Telegram into your n8n workflows with proper session management, enhanced security, and improved error handling. The new features provide better performance, security, and user experience while maintaining enterprise-grade reliability.
