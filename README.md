@@ -186,6 +186,41 @@ In-memory caching for frequently accessed data:
 
 For comprehensive troubleshooting guidance, common issues, and solutions, see our [Troubleshooting Guide](TROUBLESHOOTING_GUIDE.md).
 
+## Project Structure
+
+```
+n8n-nodes-telegram-grampro/
+├── src/
+│   ├── core/                    # Core functionality and utilities
+│   │   ├── clientManager.ts     # Client connection management
+│   │   ├── floodWaitHandler.ts  # Error handling and retry logic
+│   │   ├── logger.ts            # Structured logging system
+│   │   ├── operationHelpers.ts  # Base operation class and helpers
+│   │   ├── rateLimiter.ts       # Rate limiting and request queuing
+│   │   ├── sessionEncryption.ts # AES-256-GCM session encryption
+│   │   └── validation.ts        # Input validation
+│   ├── credentials/             # Credential type definition
+│   │   └── TelegramApi.credentials.ts
+│   ├── nodes/                   # Node implementations
+│   │   ├── TelegramMtproto.node.ts    # Main operation node
+│   │   ├── TelegramTrigger.node.ts    # Trigger node
+│   │   ├── icons/               # Node icons
+│   │   └── resources/           # Resource operations
+│   │       ├── message.operations.ts
+│   │       ├── chat.operations.ts
+│   │       ├── user.operations.ts
+│   │       ├── media.operations.ts
+│   │       ├── channel.operations.ts
+│   │       └── authentication.operations.ts
+│   ├── types/                   # Type definitions
+│   │   └── telegram.ts
+│   └── index.ts                 # Main entry point
+├── package.json                 # Project configuration
+├── tsconfig.json                # TypeScript configuration
+├── esbuild.config.mjs           # Build configuration
+└── README.md                    # Documentation
+```
+
 ## 🎨 Workflow Examples
 
 ### **Basic Message Automation**
