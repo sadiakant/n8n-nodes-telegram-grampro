@@ -1,18 +1,20 @@
 /**
  * Simple logger utility for Telegram MTProto node
  */
-const levelMap: Record<string, number> = {
+const levelMap = {
   error: 0,
   warn: 1,
   info: 2,
   debug: 3,
-};
+} as const;
 
-const resolvedLevel = (process.env.GRAMPRO_LOG_LEVEL || process.env.N8N_LOG_LEVEL || 'warn')
-  .toLowerCase();
-const currentLevel = levelMap[resolvedLevel] ?? levelMap.warn;
+type LogLevel = keyof typeof levelMap;
 
-function shouldLog(level: 'error' | 'warn' | 'info' | 'debug') {
+const resolvedEnvLevel = (process.env.GRAMPRO_LOG_LEVEL || process.env.N8N_LOG_LEVEL || 'warn').toLowerCase();
+const resolvedLevel: LogLevel = (resolvedEnvLevel in levelMap ? resolvedEnvLevel : 'warn') as LogLevel;
+const currentLevel: number = levelMap[resolvedLevel];
+
+function shouldLog(level: LogLevel) {
   return levelMap[level] <= currentLevel;
 }
 

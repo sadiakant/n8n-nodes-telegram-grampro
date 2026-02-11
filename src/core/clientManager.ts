@@ -2,15 +2,44 @@ import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions';
 import { LogLevel } from 'telegram/extensions/Logger';
 import { logger } from './logger';
+import { SessionEncryption } from './sessionEncryption';
 
 // Store active clients
 const clients = new Map<string, TelegramClient>();
 // Store active connection promises to prevent race conditions (Thundering Herd)
 const connectionLocks = new Map<string, Promise<TelegramClient>>();
+// Store connection timestamps for cleanup
+const connectionTimestamps = new Map<string, number>();
+// Cleanup interval for stale connections (5 minutes)
+const CLEANUP_INTERVAL = 5 * 60 * 1000;
+const MAX_CONNECTION_AGE = 30 * 60 * 1000; // 30 minutes
+
+// Automatic cleanup of stale connections
+setInterval(() => {
+  cleanupStaleConnections();
+}, CLEANUP_INTERVAL);
+
+function cleanupStaleConnections(): void {
+  const now = Date.now();
+  const staleKeys: string[] = [];
+  
+  for (const [key, timestamp] of connectionTimestamps.entries()) {
+    if (now - timestamp > MAX_CONNECTION_AGE) {
+      staleKeys.push(key);
+    }
+  }
+  
+  for (const key of staleKeys) {
+    connectionLocks.delete(key);
+    connectionTimestamps.delete(key);
+    logger.debug(`[ClientManager] Cleaned up stale connection lock: ${key}`);
+  }
+}
 
 export async function getClient(apiId: number | string, apiHash: string, session: string) {
     const numericApiId = typeof apiId === 'string' ? parseInt(apiId, 10) : apiId;
-    const key = `${numericApiId}:${session.slice(0, 10)}`; // Create a unique key based on ID and partial session
+    // Use a more robust key generation to prevent collisions
+    const key = `${numericApiId}:${session.length > 20 ? session.substring(0, 20) : session}:${session.slice(-10)}`;
 
     // 1. If this client is currently connecting, wait for that specific promise
     if (connectionLocks.has(key)) {
@@ -43,7 +72,24 @@ export async function getClient(apiId: number | string, apiHash: string, session
     const connectPromise = (async () => {
         logger.info(`[ClientManager] Initializing new client for ${numericApiId}...`);
         
-        const stringSession = new StringSession(session);
+        // Decrypt session if it's encrypted
+        let decryptedSession = session;
+        if (SessionEncryption.isEncryptedSession(session)) {
+            try {
+                // Generate encryption key from API credentials
+                const crypto = require('crypto');
+                const combined = `${numericApiId}:${apiHash}`;
+                const encryptionKey = crypto.createHash('sha256').update(combined).digest('hex').substring(0, 32);
+                
+                decryptedSession = SessionEncryption.decryptSession(session, encryptionKey);
+                logger.debug(`[ClientManager] Session decrypted successfully for ${numericApiId}`);
+            } catch (error) {
+                logger.error(`[ClientManager] Session decryption failed for ${numericApiId}: ${error}`);
+                throw new Error(`Session decryption failed: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
+        
+        const stringSession = new StringSession(decryptedSession);
         const client = new TelegramClient(stringSession, numericApiId, apiHash, {
             connectionRetries: 5,
             useWSS: false, // TCP is more stable for server-side n8n than WSS
@@ -67,13 +113,15 @@ export async function getClient(apiId: number | string, apiHash: string, session
             await gracefulDestroy(client);
             throw error;
         } finally {
-            // Remove the lock so future requests can try again if this failed
+            // Remove the lock and timestamp so future requests can try again if this failed
             connectionLocks.delete(key);
+            connectionTimestamps.delete(key);
         }
     })();
 
-    // Set the lock
+    // Set the lock and track timestamp
     connectionLocks.set(key, connectPromise);
+    connectionTimestamps.set(key, Date.now());
     
     return await connectPromise;
 }
@@ -115,5 +163,6 @@ export async function cleanupAllClients(): Promise<void> {
     await Promise.all(promises);
     clients.clear();
     connectionLocks.clear();
+    connectionTimestamps.clear();
     logger.info('[ClientManager] Cleanup complete.');
 }

@@ -79,10 +79,8 @@ export class SessionEncryption {
       const decipher = crypto.createDecipheriv(this.ALGORITHM, key, iv);
       decipher.setAuthTag(tag);
       
-      let decrypted = decipher.update(encryptedData, null, 'utf8');
-      decrypted += decipher.final('utf8');
-      
-      return decrypted;
+      const decryptedBuffer = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
+      return decryptedBuffer.toString('utf8');
     } catch (error) {
       throw new Error(`Session decryption failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -106,9 +104,14 @@ export class SessionEncryption {
       // Try to decode as base64
       const decoded = Buffer.from(session, 'base64');
       
-      // Encrypted sessions should be longer than plain sessions
-      // and have a specific structure (salt + iv + tag + data)
-      return decoded.length > 100 && decoded.length % 2 === 0;
+      // Encrypted sessions should have a specific structure:
+      // salt (16 bytes) + iv (16 bytes) + tag (16 bytes) + data (at least 10 bytes)
+      const minEncryptedLength = 16 + 16 + 16 + 10; // 58 bytes minimum
+      const maxPlainLength = 100; // Plain sessions should be under 100 bytes
+      
+      // Encrypted sessions must be at least 58 bytes
+      // and typically longer than plain text sessions
+      return decoded.length >= minEncryptedLength && decoded.length % 2 === 0;
     } catch {
       return false;
     }

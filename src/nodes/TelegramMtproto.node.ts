@@ -1,4 +1,4 @@
-import { IExecuteFunctions } from 'n8n-workflow';
+import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
 import { INodeType, INodeTypeDescription, NodeOperationError } from 'n8n-workflow';
 
 import { messageRouter } from './resources/message.operations';
@@ -9,46 +9,45 @@ import { channelRouter } from './resources/channel.operations';
 import { authenticationRouter } from './resources/authentication.operations';
 
 export class TelegramMtproto implements INodeType {
-    description: INodeTypeDescription = {
-        displayName: 'Telegram GramPro',
-        name: 'telegramMtproto',
-        icon: 'file:icons/telegram.svg',
-        group: ['transform'],
-        version: 1,
-        description: 'Advanced Telegram MTProto client',
-        defaults: { name: 'Telegram GramPro' },
-        inputs: ['main'],
-        outputs: ['main'],
-        
-        // HIDE CREDENTIALS when doing Initial Authentication
-        credentials: [
-            {
-                name: 'telegramApi',
-                required: true,
-                displayOptions: {
-                    hide: {
-                        resource: ['authentication'],
-                    },
-                },
-            },
-        ],
+	description: INodeTypeDescription = {
+		displayName: 'Telegram GramPro',
+		name: 'telegramMtproto',
+		icon: 'file:icons/telegram.svg',
+		group: ['transform'],
+		version: 1,
+		description: 'Advanced Telegram MTProto client',
+		defaults: { name: 'Telegram GramPro' },
+		inputs: ['main'],
+		outputs: ['main'],
 
-        properties: [
-            {
-                displayName: 'Resource',
-                name: 'resource',
-                type: 'options',
-                noDataExpression: true,
-                options: [
-                    { name: 'Session Generator', value: 'authentication' },
-                    { name: 'Channel', value: 'channel' },
-                    { name: 'Chat', value: 'chat' },
-                    { name: 'Media', value: 'media' },
-                    { name: 'Message', value: 'message' },
-                    { name: 'User', value: 'user' },
-                ],
-                default: 'message',
-            },
+		credentials: [
+			{
+				name: 'telegramApi',
+				required: true,
+				displayOptions: {
+					hide: {
+						resource: ['authentication'],
+					},
+				},
+			},
+		],
+
+		properties: [
+			{
+				displayName: 'Resource',
+				name: 'resource',
+				type: 'options',
+				noDataExpression: true,
+				options: [
+					{ name: 'Auth', value: 'authentication' },
+					{ name: 'Channel', value: 'channel' },
+					{ name: 'Chat', value: 'chat' },
+					{ name: 'Media', value: 'media' },
+					{ name: 'Message', value: 'message' },
+					{ name: 'User', value: 'user' },
+				],
+				default: 'message',
+			},
 			// MESSAGE OPS
 			{
 				displayName: 'Operation',
@@ -60,17 +59,18 @@ export class TelegramMtproto implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'Send Text', value: 'sendText' },
-					{ name: 'Forward Message', value: 'forwardMessage' },
-					{ name: 'Copy Message', value: 'copyMessage' },
-					{ name: 'Get Messages', value: 'getHistory' },
-					{ name: 'Edit Message', value: 'editMessage' },    
-					{ name: 'Edit Message Media', value: 'editMessageMedia' },
-					{ name: 'Delete Message', value: 'deleteMessage' },
-					{ name: 'Delete History', value: 'deleteHistory', action: 'Delete all messages in a chat history' },
-					{ name: 'Pin Message', value: 'pinMessage' },
-					{ name: 'Unpin Message', value: 'unpinMessage' },
-        			{ name: 'Send Poll', value: 'sendPoll' }, 
+					{ name: 'Send Message', value: 'sendText', action: 'Send Message' },
+					{ name: 'Forward Message', value: 'forwardMessage', action: 'Forward Message' },
+					{ name: 'Copy Message', value: 'copyMessage', action: 'Copy Message' },
+					{ name: 'Get Chat History', value: 'getHistory', action: 'Get Chat History' },
+					{ name: 'Edit Message', value: 'editMessage', action: 'Edit Message' },
+					{ name: 'Edit Message Media', value: 'editMessageMedia', action: 'Edit Message Media' },
+					{ name: 'Delete Message', value: 'deleteMessage', action: 'Delete Message' },
+					{ name: 'Clear Chat History', value: 'deleteHistory', action: 'Clear Chat History' },
+					{ name: 'Pin Message', value: 'pinMessage', action: 'Pin Message' },
+					{ name: 'Unpin Message', value: 'unpinMessage', action: 'Unpin Message' },
+					{ name: 'Create Poll', value: 'sendPoll', action: 'Create Poll' },
+					{ name: 'Copy Restricted Content', value: 'copyRestrictedContent', action: 'Copy Restricted Content' },
 				],
 				default: 'sendText',
 			},
@@ -86,16 +86,27 @@ export class TelegramMtproto implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'Get Chat', value: 'getChat' },
-					{ name: 'Get Dialogs', value: 'getDialogs' },
-					{ name: 'Join Channel', value: 'joinChat' },   
-    				{ name: 'Leave Channel', value: 'leaveChat' }, 
-					{ name: 'Join Group', value: 'joinGroup' },
-					{ name: 'Leave Group', value: 'leaveGroup' },
-					{ name: 'Create Group', value: 'createChat' },
-					{ name: 'Create Channel', value: 'createChannel' },
+					{ name: 'Get Chat Info', value: 'getChat', action: 'Get Chat Info' },
+					{ name: 'Get Chats List', value: 'getDialogs', action: 'Get Chats List' },
+					{ name: 'Join Channel / Supergroup', value: 'joinChat', action: 'Join Channel / Supergroup' },
+					{ name: 'Leave Channel / Group', value: 'leaveChat', action: 'Leave Channel / Group' },
+					{ name: 'Create Group', value: 'createChat', action: 'Create Group' },
+					{ name: 'Create Channel', value: 'createChannel', action: 'Create Channel' },
 				],
 				default: 'getChat',
+			},
+			{
+				displayName: 'Number of Results',
+				name: 'limit',
+				type: 'number',
+				default: 50,
+				displayOptions: {
+					show: {
+						resource: ['chat'],
+						operation: ['getDialogs'],
+					},
+				},
+				description: 'Maximum number of chats to return',
 			},
 
 			// USER OPS
@@ -109,13 +120,16 @@ export class TelegramMtproto implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'Get Me', value: 'getMe' },
+					{ name: 'Get My Profile', value: 'getMe', action: 'Get My Profile' },
 					{
-						name: 'Get Full User Info',
+						name: 'Get User Profile',
 						value: 'getFullUser',
 						description: 'Get detailed information about a user including bio and common chats',
-						action: 'Get full user info',
+						action: 'Get User Profile',
 					},
+					{ name: 'Update My Profile', value: 'updateProfile', action: 'Update My Profile' },
+					{ name: 'Update My Username', value: 'updateUsername', action: 'Update My Username' },
+					{ name: 'Get Profile Photo', value: 'getProfilePhoto', action: 'Get Profile Photo' },
 				],
 				default: 'getFullUser',
 			},
@@ -131,7 +145,7 @@ export class TelegramMtproto implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'Download Media', value: 'downloadMedia' },
+					{ name: 'Download Media', value: 'downloadMedia', action: 'Download Media' },
 				],
 				default: 'downloadMedia',
 			},
@@ -147,13 +161,12 @@ export class TelegramMtproto implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'Get Admin & Bots', value: 'getParticipants' },
-					{ name: 'Get Public Members', value: 'getMembers' },
-					{ name: 'Add Member', value: 'addMember' },
-					{ name: 'Remove Member', value: 'removeMember' },
-					{ name: 'Ban User', value: 'banUser' },
-					{ name: 'Unban User', value: 'unbanUser' },
-					{ name: 'Promote User to Admin', value: 'promoteUser' },
+					{ name: 'Get Members', value: 'getMembers', action: 'Get Members' },
+					{ name: 'Add Member', value: 'addMember', action: 'Add Member' },
+					{ name: 'Remove Member', value: 'removeMember', action: 'Remove Member' },
+					{ name: 'Ban User', value: 'banUser', action: 'Ban User' },
+					{ name: 'Unban User', value: 'unbanUser', action: 'Unban User' },
+					{ name: 'Promote to Admin', value: 'promoteUser', action: 'Promote to Admin' },
 				],
 				default: 'getParticipants',
 			},
@@ -169,18 +182,18 @@ export class TelegramMtproto implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'Step:1 RequestCode', value: 'requestCode' },
-					{ name: 'Step:2 Generate String', value: 'signIn' },
+					{ name: 'Request Login Code', value: 'requestCode', action: 'Request Login Code' },
+					{ name: 'Complete Login', value: 'signIn', action: 'Complete Login' },
 				],
 				default: 'requestCode',
 			},
 
-            // AUTHENTICATION FIELDS
+			// AUTHENTICATION FIELDS
 			{
-				displayName: 'API ID',
+				displayName: 'App api_id',
 				name: 'apiId',
 				type: 'number',
-				default: '={{ $json.apiId }}', 
+				default: '={{ $json.apiId }}',
 				required: true,
 				displayOptions: {
 					show: {
@@ -190,10 +203,10 @@ export class TelegramMtproto implements INodeType {
 				description: 'Your Telegram API ID from https://my.telegram.org',
 			},
 			{
-				displayName: 'API Hash',
+				displayName: 'App api_hash',
 				name: 'apiHash',
 				type: 'string',
-				default: '={{ $json.apiHash }}', 
+				default: '={{ $json.apiHash }}',
 				required: true,
 				displayOptions: {
 					show: {
@@ -206,7 +219,7 @@ export class TelegramMtproto implements INodeType {
 				displayName: 'Phone Number',
 				name: 'phoneNumber',
 				type: 'string',
-				default: '={{ $json.phoneNumber }}', 
+				default: '={{ $json.phoneNumber }}',
 				required: true,
 				displayOptions: {
 					show: {
@@ -216,7 +229,7 @@ export class TelegramMtproto implements INodeType {
 				description: 'Phone number in international format (e.g., +1234567890)',
 			},
 			{
-				displayName: 'Phone Code',
+				displayName: 'Verification Code',
 				name: 'phoneCode',
 				type: 'string',
 				default: '',
@@ -232,7 +245,7 @@ export class TelegramMtproto implements INodeType {
 				displayName: 'Phone Code Hash',
 				name: 'phoneCodeHash',
 				type: 'string',
-				default: '={{ $json.phoneCodeHash }}', 
+				default: '={{ $json.phoneCodeHash }}',
 				displayOptions: {
 					show: {
 						resource: ['authentication'],
@@ -245,7 +258,7 @@ export class TelegramMtproto implements INodeType {
 				displayName: 'Pre-Auth Session String',
 				name: 'preAuthSession',
 				type: 'string',
-				default: '={{ $json.preAuthSession }}', 
+				default: '={{ $json.preAuthSession }}',
 				displayOptions: {
 					show: {
 						resource: ['authentication'],
@@ -255,13 +268,13 @@ export class TelegramMtproto implements INodeType {
 				description: 'The temporary session string returned by the Request Code operation',
 			},
 			{
-				displayName: '2FA Password',
+				displayName: 'Two-Step Verification Password',
 				name: 'password2fa',
 				type: 'string',
 				typeOptions: {
 					password: true,
 				},
-				default: '={{ $json.password2fa }}', 
+				default: '={{ $json.password2fa }}',
 				displayOptions: {
 					show: {
 						resource: ['authentication'],
@@ -273,64 +286,206 @@ export class TelegramMtproto implements INodeType {
 			// COMMON FIELDS
 
 			{
-				displayName: 'Chat ID',
+				displayName: 'Chat / Username',
 				name: 'chatId',
 				type: 'string',
 				default: '',
+				required: true,
 				displayOptions: {
 					show: {
-						operation: ['sendText', 'getChat', 'getUsers'],
+						resource: ['message', 'chat', 'media'],
+						operation: [
+							'sendText', 'getChat', 'getHistory', 'editMessage',
+							'deleteMessage', 'deleteHistory', 'pinMessage',
+							'unpinMessage', 'sendPoll', 'joinChat', 'leaveChat',
+							'leaveGroup', 'editMessageMedia', 'downloadMedia',
+						],
+					},
+					hide: {
+						sendToSelf: [true],
+						editFromSelf: [true],
+						editMediaFromSelf: [true],
+						historyFromSelf: [true],
 					},
 				},
+				description: 'Username (@channel), Invite Link (t.me/...), or numeric ID',
+			},
+			{
+				displayName: 'Send to Saved Messages',
+				name: 'sendToSelf',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['sendText'],
+					},
+				},
+				description: 'If enabled, message is sent to your Saved Messages (me) and the chat field is hidden',
+			},
+			{
+				displayName: 'Edit in Saved Messages',
+				name: 'editFromSelf',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['editMessage'],
+					},
+				},
+				description: 'If enabled, edits a message in your Saved Messages (me) and hides the chat field',
+			},
+			{
+				displayName: 'Edit Media in Saved Messages',
+				name: 'editMediaFromSelf',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['editMessageMedia'],
+					},
+				},
+				description: 'If enabled, edits message media in your Saved Messages (me) and hides the chat field',
+			},
+			{
+				displayName: 'Get from Saved Messages',
+				name: 'historyFromSelf',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['getHistory'],
+					},
+				},
+				description: 'If enabled, fetches history from your Saved Messages (me) and hides the chat field',
 			},
 
 			{
-				displayName: 'Message',
+				displayName: 'Message Text',
 				name: 'text',
 				type: 'string',
 				default: '',
 				displayOptions: {
 					show: {
-						operation: ['sendText','editMessage'],
+						operation: ['sendText', 'editMessage'],
 					},
 				},
 			},
-
 			{
-				displayName: 'From Chat',
-				name: 'fromChatId',
-				type: 'string',
-				default: '',
-				displayOptions: {
-					show: {
-						operation: ['forwardMessage'],
-					},
-				},
-			},
-
-			{
-				displayName: 'To Chat',
-				name: 'toChatId',
-				type: 'string',
-				default: '',
-				displayOptions: {
-					show: {
-						operation: ['forwardMessage'],
-					},
-				},
-			},
-
-			{
-				displayName: 'Message ID',
-				name: 'messageId',
-				type: 'number',
-				default: 0,
+				displayName: 'Show Web Preview',
+				name: 'webPreview',
+				type: 'boolean',
+				default: true,
 				displayOptions: {
 					show: {
 						resource: ['message'],
-						operation: ['editMessage', 'editMessageMedia', 'deleteMessage', 'pinMessage', 'unpinMessage', 'forwardMessage', 'copyMessage'],
+						operation: ['sendText'],
 					},
 				},
+				description: 'Enable link previews when the message contains URLs',
+			},
+			{
+				displayName: 'Attach Media',
+				name: 'attachMedia',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['sendText'],
+					},
+				},
+				description: 'Upload a photo, video, or document with the message',
+			},
+			{
+				displayName: 'Media Type',
+				name: 'mediaType',
+				type: 'options',
+				default: 'document',
+				options: [
+					{ name: 'Photo', value: 'photo' },
+					{ name: 'Video', value: 'video' },
+					{ name: 'Document', value: 'document' },
+				],
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['sendText'],
+						attachMedia: [true],
+					},
+				},
+				description: 'Select the kind of media you are attaching',
+			},
+			{
+				displayName: 'Binary Property',
+				name: 'mediaBinaryProperty',
+				type: 'string',
+				default: 'data',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['sendText'],
+						attachMedia: [true],
+					},
+				},
+				description: 'Name of the binary property that contains the file to upload',
+			},
+			{
+				displayName: 'Media URL',
+				name: 'mediaUrl',
+				type: 'string',
+				default: '',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['sendText'],
+						attachMedia: [true],
+					},
+				},
+				description: 'Optional direct URL to a file (photo/video/document). If provided, it will be used when no binary data is supplied.',
+			},
+
+			{
+				displayName: 'Source Chat',
+				name: 'sourceChatId',
+				type: 'string',
+				default: '',
+				required: true,
+				displayOptions: {
+					show: {
+						operation: ['forwardMessage'],
+					},
+				},
+				description: 'Username (@channel), Invite Link, or ID',
+			},
+			{
+				displayName: 'Target Chat',
+				name: 'targetChatId',
+				type: 'string',
+				default: '',
+				required: true,
+				displayOptions: {
+					show: {
+						operation: ['forwardMessage'],
+						saveToSavedMessages: [false],
+					},
+				},
+				description: 'Username (@channel), Invite Link, or ID',
+			},
+			{
+				displayName: 'Forward to Saved Messages',
+				name: 'saveToSavedMessages',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						operation: ['forwardMessage'],
+					},
+				},
+				description: 'If true, forwards to your Saved Messages instead of target chat',
 			},
 
 			{
@@ -351,7 +506,7 @@ export class TelegramMtproto implements INodeType {
 				},
 			},
 			{
-				displayName: 'Limit',
+				displayName: 'Number of Results',
 				name: 'limit',
 				type: 'number',
 				default: 10,
@@ -457,14 +612,14 @@ export class TelegramMtproto implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['message'],
-						operation: ['deleteMessage'],
+						operation: ['deleteMessage', 'deleteHistory'],
 					},
 				},
-				description: 'Whether to delete the message for everyone or just for you',
+				description: 'Whether to delete message(s) for everyone',
 			},
 
 			{
-				displayName: 'Notify Players',
+				displayName: 'Notify Members',
 				name: 'notify',
 				type: 'boolean',
 				default: false,
@@ -474,11 +629,11 @@ export class TelegramMtproto implements INodeType {
 						operation: ['pinMessage'],
 					},
 				},
-				description: 'Whether to send a notification to all chat members about the pinned message',
+				description: 'Whether to send a notification to all chat members',
 			},
 
 			{
-				displayName: 'Reply to Message ID',
+				displayName: 'Reply to Message (ID)',
 				name: 'replyTo',
 				type: 'number',
 				default: 0,
@@ -504,20 +659,7 @@ export class TelegramMtproto implements INodeType {
 				description: 'Whether to disable the link preview for URLs in the message',
 			},
 			// --- EDIT MESSAGE MEDIA PROPERTIES ---
-			{
-				displayName: 'Chat ID',
-				name: 'chatId',
-				type: 'string',
-				default: '',
-				required: true,
-				displayOptions: {
-					show: {
-						resource: ['message'],
-						operation: ['editMessageMedia'],
-					},
-				},
-				description: 'Username (@channel), Invite Link (t.me/...), or numeric ID',
-			},
+
 			{
 				displayName: 'Media',
 				name: 'media',
@@ -574,14 +716,15 @@ export class TelegramMtproto implements INodeType {
 					{ name: 'HTML', value: 'html' },
 					{ name: 'Markdown', value: 'markdown' },
 				],
-				description: 'Text formatting mode for the caption',
+				description: 'Text formatting mode for the caption. Telegram Markdown is limited (no headings/tables); use HTML for headings or table-like layouts.',
 			},
 			// --- COPY MESSAGE PROPERTIES ---
 			{
-				displayName: 'From Chat',
-				name: 'fromChatId',
+				displayName: 'Source Chat',
+				name: 'sourceChatId',
 				type: 'string',
 				default: '',
+				required: true,
 				displayOptions: {
 					show: {
 						resource: ['message'],
@@ -591,17 +734,55 @@ export class TelegramMtproto implements INodeType {
 				description: 'The chat ID, username (@channel), or invite link where the original message is located',
 			},
 			{
-				displayName: 'To Chat',
-				name: 'toChatId',
-				type: 'string',
-				default: '',
+				displayName: 'Save to Saved Messages',
+				name: 'saveToSavedMessages',
+				type: 'boolean',
+				default: false,
 				displayOptions: {
 					show: {
 						resource: ['message'],
 						operation: ['copyMessage'],
 					},
 				},
+				description: 'If true, copies to your Saved Messages instead of target chat',
+			},
+			{
+				displayName: 'Target Chat',
+				name: 'targetChatId',
+				type: 'string',
+				default: '',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['copyMessage'],
+						saveToSavedMessages: [false],
+					},
+				},
 				description: 'The chat ID, username (@channel), or invite link where the message will be copied to',
+			},
+			{
+				displayName: 'Message ID',
+				name: 'messageId',
+				type: 'number',
+				default: 0,
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['message', 'media'],
+						operation: [
+							'editMessage',
+							'editMessageMedia',
+							'deleteMessage',
+							'pinMessage',
+							'unpinMessage',
+							'forwardMessage',
+							'copyMessage',
+							'downloadMedia',
+						],
+					},
+				},
+				description: 'The ID of the message',
 			},
 			{
 				displayName: 'Caption',
@@ -629,24 +810,7 @@ export class TelegramMtproto implements INodeType {
 				},
 				description: 'Whether to disable link previews in the copied message',
 			},
-			{
-				displayName: 'Chat ID / Invite Link',
-				name: 'chatId',
-				type: 'string',
-				default: '',
-				required: true,
-				displayOptions: {
-					show: {
-						resource: ['message', 'chat'], 
-						operation: [
-							'getHistory', 'editMessage', 
-							'deleteMessage', 'deleteHistory', 'pinMessage', 'unpinMessage', 
-							'sendPoll', 'joinChat', 'leaveChat', 'joinGroup', 'leaveGroup'
-						],
-					},
-                },
-				description: 'Username (@channel), Invite Link (t.me/...), or numeric ID',
-			},
+
 			{
 				displayName: 'Max Message ID',
 				name: 'maxId',
@@ -659,19 +823,6 @@ export class TelegramMtproto implements INodeType {
 					},
 				},
 				description: 'Maximum ID of message to delete. 0 to delete all messages.',
-			},
-			{
-				displayName: 'Delete for Everyone',
-				name: 'revoke',
-				type: 'boolean',
-				default: true,
-				displayOptions: {
-					show: {
-						resource: ['message'],
-						operation: ['deleteHistory'],
-					},
-				},
-				description: 'Whether to delete the messages for everyone (true) or just for yourself (false).',
 			},
 			// --- POLL PROPERTIES ---
 			{
@@ -704,7 +855,7 @@ export class TelegramMtproto implements INodeType {
 					show: { resource: ['message'], operation: ['sendPoll'] },
 				},
 			},
-			
+
 			{
 				displayName: 'Title',
 				name: 'chatTitle',
@@ -725,18 +876,18 @@ export class TelegramMtproto implements INodeType {
 				},
 				description: 'The description of the group or channel',
 			},
-			
+
 			{
 				displayName: 'Anonymous Voting',
 				name: 'anonymous',
 				type: 'boolean',
-				default: true, 
+				default: true,
 				displayOptions: {
 					show: { resource: ['message'], operation: ['sendPoll'] },
 				},
 				description: 'If true, no one can see who voted for what. Required for Channels.',
 			},
-			
+
 			{
 				displayName: 'Correct Answer Index',
 				name: 'correctAnswerIndex',
@@ -756,7 +907,21 @@ export class TelegramMtproto implements INodeType {
 			},
 
 			{
-				displayName: 'User ID',
+				displayName: 'My Profile Photo Only',
+				name: 'myProfilePhotoOnly',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						resource: ['user'],
+						operation: ['getProfilePhoto'],
+					},
+				},
+				description: 'If true, gets your own profile photo without requiring userId',
+			},
+
+			{
+				displayName: 'User',
 				name: 'userId',
 				type: 'string',
 				required: true,
@@ -764,46 +929,23 @@ export class TelegramMtproto implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['user'],
-						operation: ['getFullUser'],
+						operation: ['getFullUser', 'getProfilePhoto'],
+					},
+					hide: {
+						myProfilePhotoOnly: [true],
 					},
 				},
 				placeholder: '@username or 123456789',
-				description: 'The username or numeric ID of the user to fetch details for',
+				description: 'Username or numeric ID',
 			},
 
 			// MEDIA FIELDS
-			{
-				displayName: 'Chat ID',
-				name: 'chatId',
-				type: 'string',
-				default: '',
-				required: true,
-				displayOptions: {
-					show: {
-						resource: ['media'],
-						operation: ['downloadMedia'],
-					},
-				},
-				description: 'Chat ID or username where the message with media is located',
-			},
-			{
-				displayName: 'Message ID',
-				name: 'messageId',
-				type: 'number',
-				default: 0,
-				required: true,
-				displayOptions: {
-					show: {
-						resource: ['media'],
-						operation: ['downloadMedia'],
-					},
-				},
-				description: 'The ID of the message containing the media to download',
-			},
+
+
 
 			// CHANNEL FIELDS
 			{
-				displayName: 'Channel ID',
+				displayName: 'Channel / Group',
 				name: 'channelId',
 				type: 'string',
 				default: '',
@@ -811,7 +953,7 @@ export class TelegramMtproto implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['channel'],
-						operation: ['getParticipants', 'getMembers', 'addMember', 'removeMember'],
+						operation: ['getMembers', 'addMember', 'removeMember', 'banUser', 'unbanUser', 'promoteUser'],
 					},
 				},
 				description: 'Channel or group ID, username (@channel), or invite link',
@@ -825,10 +967,10 @@ export class TelegramMtproto implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['channel'],
-						operation: ['getParticipants', 'getMembers'],
+						operation: ['getMembers'],
 					},
 				},
-				description: 'Maximum number of members to retrieve (leave empty to get all members)',
+				description: 'Maximum number of members to retrieve (leave empty to get all)',
 			},
 			{
 				displayName: 'Filter Admin Participants',
@@ -838,10 +980,10 @@ export class TelegramMtproto implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['channel'],
-						operation: ['getParticipants'],
+						operation: ['getMembers'],
 					},
 				},
-				description: 'Whether to filter and show only admin participants',
+				description: 'Show only admin participants',
 			},
 			{
 				displayName: 'Filter Bot Participants',
@@ -851,10 +993,49 @@ export class TelegramMtproto implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['channel'],
-						operation: ['getParticipants'],
+						operation: ['getMembers'],
 					},
 				},
-				description: 'Whether to filter and show only bot participants',
+				description: 'Show only bot participants',
+			},
+			{
+				displayName: 'Exclude Admins',
+				name: 'excludeAdmins',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						resource: ['channel'],
+						operation: ['getMembers'],
+					},
+				},
+				description: 'If enabled, remove admins from the results (overrides Filter Admin Participants)',
+			},
+			{
+				displayName: 'Exclude Bots',
+				name: 'excludeBots',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						resource: ['channel'],
+						operation: ['getMembers'],
+					},
+				},
+				description: 'If enabled, remove bots from the results (overrides Filter Bot Participants)',
+			},
+			{
+				displayName: 'Exclude Deleted / Long Ago',
+				name: 'excludeDeletedAndLongAgo',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						resource: ['channel'],
+						operation: ['getMembers'],
+					},
+				},
+				description: 'Exclude deleted accounts and users with long-ago status',
 			},
 			{
 				displayName: 'Show Only Online Members',
@@ -867,10 +1048,10 @@ export class TelegramMtproto implements INodeType {
 						operation: ['getMembers'],
 					},
 				},
-				description: 'Whether to show only online members',
+				description: 'Show only online members',
 			},
 			{
-				displayName: 'User ID to Add',
+				displayName: 'User to Add',
 				name: 'userIdToAdd',
 				type: 'string',
 				default: '',
@@ -885,7 +1066,7 @@ export class TelegramMtproto implements INodeType {
 				description: 'The username or numeric ID of the user to add to the channel/group',
 			},
 			{
-				displayName: 'User ID to Remove',
+				displayName: 'User to Remove',
 				name: 'userIdToRemove',
 				type: 'string',
 				default: '',
@@ -899,22 +1080,9 @@ export class TelegramMtproto implements INodeType {
 				placeholder: '@username or 123456789',
 				description: 'The username or numeric ID of the user to remove from the channel/group',
 			},
+
 			{
-				displayName: 'Channel ID',
-				name: 'channelId',
-				type: 'string',
-				default: '',
-				required: true,
-				displayOptions: {
-					show: {
-						resource: ['channel'],
-						operation: ['banUser'],
-					},
-				},
-				description: 'Channel or group ID, username (@channel), or invite link',
-			},
-			{
-				displayName: 'User ID to Ban',
+				displayName: 'User to Ban',
 				name: 'userIdToBan',
 				type: 'string',
 				default: '',
@@ -954,22 +1122,9 @@ export class TelegramMtproto implements INodeType {
 				},
 				description: 'Reason for banning the user',
 			},
+
 			{
-				displayName: 'Channel ID',
-				name: 'channelId',
-				type: 'string',
-				default: '',
-				required: true,
-				displayOptions: {
-					show: {
-						resource: ['channel'],
-						operation: ['unbanUser'],
-					},
-				},
-				description: 'Channel or group ID, username (@channel), or invite link',
-			},
-			{
-				displayName: 'User ID to Unban',
+				displayName: 'User to Unban',
 				name: 'userIdToUnban',
 				type: 'string',
 				default: '',
@@ -983,22 +1138,9 @@ export class TelegramMtproto implements INodeType {
 				placeholder: '@username or 123456789',
 				description: 'The username or numeric ID of the user to unban from the channel/group',
 			},
+
 			{
-				displayName: 'Channel ID',
-				name: 'channelId',
-				type: 'string',
-				default: '',
-				required: true,
-				displayOptions: {
-					show: {
-						resource: ['channel'],
-						operation: ['promoteUser'],
-					},
-				},
-				description: 'Channel or group ID, username (@channel), or invite link',
-			},
-			{
-				displayName: 'User ID to Promote',
+				displayName: 'User to Promote',
 				name: 'userIdToPromote',
 				type: 'string',
 				default: '',
@@ -1247,21 +1389,7 @@ export class TelegramMtproto implements INodeType {
 				},
 				description: 'New username for your account',
 			},
-			{
-				displayName: 'User ID',
-				name: 'userId',
-				type: 'string',
-				default: '',
-				required: true,
-				displayOptions: {
-					show: {
-						resource: ['user'],
-						operation: ['getProfilePhoto'],
-					},
-				},
-				placeholder: '@username or 123456789',
-				description: 'The username or numeric ID of the user to get profile photo for',
-			},
+
 			{
 				displayName: 'Photo Size',
 				name: 'photoSize',
@@ -1282,75 +1410,143 @@ export class TelegramMtproto implements INodeType {
 				description: 'Size of the profile photo to download',
 			},
 
+			// --- COPY RESTRICTED CONTENT FIELDS ---
+			{
+				displayName: 'Source Chat / Username',
+				name: 'sourceChatId',
+				type: 'string',
+				default: '',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['copyRestrictedContent'],
+					},
+				},
+				description: 'Username (@channel), Invite Link, or ID',
+			},
+			{
+				displayName: 'Message ID',
+				name: 'messageId',
+				type: 'string',
+				default: '',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['copyRestrictedContent'],
+					},
+				},
+				description: 'The ID of the message to copy',
+			},
+			{
+				displayName: 'Target Chat / Username',
+				name: 'targetChatId',
+				type: 'string',
+				default: '',
+				required: false,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['copyRestrictedContent'],
+						saveToSavedMessages: [false],
+					},
+				},
+				description: 'Username (@channel), Invite Link, or ID',
+			},
+			{
+				displayName: 'Save to Saved Messages',
+				name: 'saveToSavedMessages',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['copyRestrictedContent'],
+					},
+				},
+				description: 'If true, sends to your Saved Messages instead of target chat',
+			},
+			{
+				displayName: 'Include Caption',
+				name: 'includeCaption',
+				type: 'boolean',
+				default: true,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['copyRestrictedContent'],
+					},
+				},
+				description: 'Include the original message caption/text',
+			},
+			{
+				displayName: 'Download Timeout (seconds)',
+				name: 'downloadTimeout',
+				type: 'number',
+				default: 60,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['copyRestrictedContent'],
+					},
+				},
+				description: 'Timeout for downloading large media files',
+			},
+
 		],
 	};
 
-	// ---------------- EXECUTOR ----------------
-    async execute(this: IExecuteFunctions) {
-        const resource = this.getNodeParameter('resource', 0) as string;
-        const operation = this.getNodeParameter('operation', 0) as string;
-        
-        // --- RETRY CONFIGURATION ---
-        const MAX_RETRIES = 3;
-        const RETRY_DELAY_MS = 2000;
-        
-        let lastError: any;
+	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+		const items = this.getInputData();
+		const returnData: INodeExecutionData[] = [];
 
-        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-            try {
-                // Determine which router to call
-                let result;
-                switch (resource) {
-                    case 'authentication': 
-                        result = await authenticationRouter.call(this, operation);
-                        break;
-                    case 'message': 
-                        result = await messageRouter.call(this, operation);
-                        break;
-                    case 'chat': 
-                        result = await chatRouter.call(this, operation);
-                        break;
-                    case 'user': 
-                        result = await userRouter.call(this, operation);
-                        break;
-                    case 'media': 
-                        result = await mediaRouter.call(this, operation);
-                        break;
-                    case 'channel': 
-                        result = await channelRouter.call(this, operation);
-                        break;
-                    default:
-                        throw new Error(`Resource ${resource} is not supported.`);
-                }
-                
-                // If successful, return the result immediately
-                return result;
+		for (let i = 0; i < items.length; i++) {
+			const resource = this.getNodeParameter('resource', i) as string;
+			const operation = this.getNodeParameter('operation', i) as string;
 
-            } catch (error) {
-                lastError = error;
-                const errorMessage = (error.message || JSON.stringify(error)).toLowerCase();
-                
-                // Check if the error is related to connection issues
-                const isConnectionError = 
-                    errorMessage.includes('timeout') || 
-                    errorMessage.includes('not connected') || 
-                    errorMessage.includes('connection closed') ||
-                    errorMessage.includes('stale') ||
-                    errorMessage.includes('socket');
+			try {
+				let result: INodeExecutionData[] = [];
 
-                if (isConnectionError && attempt < MAX_RETRIES) {
-                    console.warn(`[TelegramMtproto] Attempt ${attempt} failed with connection error: "${errorMessage}". Retrying in ${RETRY_DELAY_MS}ms...`);
-                    // Wait before retrying
-                    await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
-                    continue;
-                } else {
-                    // If it's not a connection error or we've run out of retries, throw it
-                    if (attempt === MAX_RETRIES && isConnectionError) {
-                         throw new NodeOperationError(this.getNode(), `Telegram Connection Failed after ${MAX_RETRIES} attempts: ${lastError.message}`);
-                    }
-                    throw error;
-                }
-            }
-        }
-    }
+				switch (resource) {
+					case 'authentication':
+						result = await authenticationRouter.call(this, operation, i);
+						break;
+					case 'message':
+						result = await messageRouter.call(this, operation, i);
+						break;
+					case 'chat':
+						result = await chatRouter.call(this, operation, i);
+						break;
+					case 'user':
+						result = await userRouter.call(this, operation, i);
+						break;
+					case 'media':
+						result = await mediaRouter.call(this, operation, i);
+						break;
+					case 'channel':
+						result = await channelRouter.call(this, operation, i);
+						break;
+					default:
+						throw new Error(`Resource ${resource} is not supported.`);
+				}
+
+				if (result && result.length > 0) {
+					returnData.push(...result);
+				}
+
+			} catch (error: any) {
+				if (this.continueOnFail()) {
+					returnData.push({
+						json: { error: error.message },
+						pairedItem: { item: i },
+					});
+					continue;
+				}
+				throw new NodeOperationError(this.getNode(), error, { itemIndex: i });
+			}
+		}
+
+		return [returnData];
+	}
 }

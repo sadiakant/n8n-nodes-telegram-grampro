@@ -1,30 +1,51 @@
 import { logger } from './logger';
 
+interface QueuedRequest<T = any> {
+  fn: () => Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: unknown) => void;
+}
+
 /**
  * Rate limiter for Telegram API calls
  */
 export class RateLimiter {
   private static instance: RateLimiter;
-  private requestQueue: Array<{ fn: () => Promise<any>; resolve: (value: any) => void; reject: (error: any) => void }>;
+  private static _instance: RateLimiter | null = null;
+  private static _lock: boolean = false;
+  private requestQueue: QueuedRequest[];
   private isProcessing: boolean;
   private lastRequestTime: number;
   private minInterval: number; // Minimum interval between requests in milliseconds
+  private maxQueueSize: number; // Maximum queue size to prevent DoS
 
   private constructor() {
     this.requestQueue = [];
     this.isProcessing = false;
     this.lastRequestTime = 0;
     this.minInterval = 1000; // 1 second between requests (Telegram's recommended rate)
+    this.maxQueueSize = 1000; // Maximum 1000 requests in queue
   }
 
   /**
-   * Get the singleton instance
+   * Get the singleton instance (thread-safe)
    */
   public static getInstance(): RateLimiter {
-    if (!RateLimiter.instance) {
-      RateLimiter.instance = new RateLimiter();
+    if (!RateLimiter._instance) {
+      if (!RateLimiter._lock) {
+        RateLimiter._lock = true;
+        if (!RateLimiter._instance) {
+          RateLimiter._instance = new RateLimiter();
+        }
+        RateLimiter._lock = false;
+      } else {
+        while (RateLimiter._lock) {}
+        if (!RateLimiter._instance) {
+          throw new Error('Failed to initialize RateLimiter instance');
+        }
+      }
     }
-    return RateLimiter.instance;
+    return RateLimiter._instance;
   }
 
   /**
@@ -34,6 +55,11 @@ export class RateLimiter {
    * @returns Promise that resolves with the function result
    */
   public async execute<T>(fn: () => Promise<T>, priority: boolean = false): Promise<T> {
+    // Check if queue is full to prevent DoS
+    if (this.requestQueue.length >= this.maxQueueSize) {
+      throw new Error('Rate limiter queue is full. Please try again later.');
+    }
+    
     return new Promise<T>((resolve, reject) => {
       const request = { fn, resolve, reject };
       
@@ -114,20 +140,6 @@ export class RateLimiter {
     });
     this.requestQueue = [];
   }
-}
-
-/**
- * Decorator for rate limiting methods
- */
-export function rateLimit(target: any, propertyName: string, descriptor: PropertyDescriptor) {
-  const method = descriptor.value;
-  const rateLimiter = RateLimiter.getInstance();
-
-  descriptor.value = async function (...args: any[]) {
-    return rateLimiter.execute(() => method.apply(this, args));
-  };
-
-  return descriptor;
 }
 
 /**

@@ -1,4 +1,3 @@
-import { TelegramClient } from 'telegram';
 import { Api } from 'telegram';
 
 /**
@@ -250,14 +249,4 @@ export interface ParticipantsOptions {
   offset?: number;
   filter?: 'admins' | 'kicked' | 'banned' | 'recent' | 'search';
   query?: string;
-}
-
-/**
- * Client manager interface
- */
-export interface IClientManager {
-  getClient(apiId: number, apiHash: string, session: string): Promise<TelegramClient>;
-  disconnectClient(apiId: number, session: string): Promise<void>;
-  cleanupAllClients(): Promise<void>;
-  isClientConnected(client: TelegramClient): Promise<boolean>;
-}
+ }

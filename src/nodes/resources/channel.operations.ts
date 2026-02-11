@@ -1,10 +1,11 @@
-import { IExecuteFunctions } from 'n8n-workflow';
+import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
 import { getClient } from '../../core/clientManager';
 import { safeExecute } from '../../core/floodWaitHandler';
 import { withRateLimit } from '../../core/rateLimiter';
 import { Api } from 'telegram';
+import bigInt from 'big-integer';
 
-export async function channelRouter(this: IExecuteFunctions, operation: string) {
+export async function channelRouter(this: IExecuteFunctions, operation: string, i: number): Promise<INodeExecutionData[]> {
 
 	const creds: any = await this.getCredentials('telegramApi');
 
@@ -16,26 +17,23 @@ export async function channelRouter(this: IExecuteFunctions, operation: string) 
 
 	switch (operation) {
 
-		case 'getParticipants':
-			return getChannelParticipants.call(this, client);
-
 		case 'getMembers':
-			return getChannelMembers.call(this, client);
+			return getChannelParticipants.call(this, client, i);
 
 		case 'addMember':
-			return addChannelMember.call(this, client);
+			return addChannelMember.call(this, client, i);
 
 		case 'removeMember':
-			return removeChannelMember.call(this, client);
+			return removeChannelMember.call(this, client, i);
 
 		case 'banUser':
-			return banUser.call(this, client);
+			return banUser.call(this, client, i);
 
 		case 'unbanUser':
-			return unbanUser.call(this, client);
+			return unbanUser.call(this, client, i);
 
 		case 'promoteUser':
-			return promoteUser.call(this, client);
+			return promoteUser.call(this, client, i);
 
 		default:
 			throw new Error(`Channel operation not supported: ${operation}`);
@@ -44,91 +42,138 @@ export async function channelRouter(this: IExecuteFunctions, operation: string) 
 
 // ----------------
 
-async function getChannelParticipants(this: IExecuteFunctions, client: any) {
-	const channelId = this.getNodeParameter('channelId', 0);
-	const limit = this.getNodeParameter('limit', 0, 50);
-	const filterAdmins = this.getNodeParameter('filterAdmins', 0, false);
-	const filterBots = this.getNodeParameter('filterBots', 0, false);
+async function getChannelParticipants(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
+	const channelId = this.getNodeParameter('channelId', i);
+	const rawLimit = this.getNodeParameter('limit', i, null) as number | null;
+	// When left empty in n8n, rawLimit may be null; treat null/undefined/NaN as "all"
+	const limit = (typeof rawLimit === 'number' && !isNaN(rawLimit)) ? rawLimit : Infinity;
+	const filterAdmins = this.getNodeParameter('filterAdmins', i, false);
+	const filterBots = this.getNodeParameter('filterBots', i, false);
+	const onlyOnline = this.getNodeParameter('onlyOnline', i, false);
+	const excludeAdmins = this.getNodeParameter('excludeAdmins', i, false);
+	const excludeBots = this.getNodeParameter('excludeBots', i, false);
+	const excludeDeletedAndLongAgo = this.getNodeParameter('excludeDeletedAndLongAgo', i, false);
 
-	const users = await withRateLimit(async () =>
-		safeExecute(() =>
-			client.getParticipants(channelId, { limit })
-		)
-	);
+	const channel = await resolveChannelEntity(client, channelId);
 
-	let filteredUsers = users;
-
-	// Apply admin filter
-	if (filterAdmins) {
-		filteredUsers = filteredUsers.filter((u: any) => u.admin_rights ? true : false);
+	// Choose Telegram native filters to avoid post-filtering misses
+	let apiFilter: any = new Api.ChannelParticipantsRecent();
+	// Exclusion overrides inclusion: if exclude is true, do not use narrow inclusion filters
+	if (!excludeAdmins && !excludeBots) {
+		if (filterAdmins && filterBots) {
+			apiFilter = new Api.ChannelParticipantsAdmins();
+		} else if (filterAdmins) {
+			apiFilter = new Api.ChannelParticipantsAdmins();
+		} else if (filterBots) {
+			apiFilter = new Api.ChannelParticipantsBots();
+		}
 	}
 
-	// Apply bot filter
-	if (filterBots) {
-		filteredUsers = filteredUsers.filter((u: any) => u.bot || false);
+	// Telegram API caps to ~200 per call; loop until we reach requested limit or exhaust
+	let offset = 0;
+	let remaining = limit;
+	const allParticipants: any[] = [];
+	const usersById = new Map<string, any>();
+
+	while (true) {
+		const batchSize = remaining === Infinity ? 200 : Math.min(remaining, 200);
+
+		const result: any = await withRateLimit(async () =>
+			safeExecute(() =>
+				client.invoke(new Api.channels.GetParticipants({
+					channel,
+					filter: apiFilter,
+					offset,
+					limit: batchSize,
+					hash: bigInt.zero,
+				}))
+			)
+		);
+
+		(result.users || []).forEach((u: any) => usersById.set(u.id?.toString(), u));
+
+		const participantsBatch: any[] = result.participants || [];
+		allParticipants.push(...participantsBatch);
+
+		// Update counters
+		offset += participantsBatch.length;
+		if (remaining !== Infinity) remaining -= participantsBatch.length;
+
+		// Stop if less than requested returned or we've hit the user-requested limit
+		if (participantsBatch.length < batchSize) break;
+		if (remaining !== Infinity && remaining <= 0) break;
 	}
 
-	const items = filteredUsers.map((u: any) => ({
-		json: {
-			id: u.id?.toString(),
-			username: u.username || null,
-			firstName: u.firstName || '',
-			lastName: u.lastName || '',
-			bot: u.bot || false,
-			isAdmin: u.admin_rights ? true : false,
-			isCreator: u.admin_rights?.isCreator || false,
-		},
-	}));
-
-	return [items];
-}
-
-async function getChannelMembers(this: IExecuteFunctions, client: any) {
-	const channelId = this.getNodeParameter('channelId', 0);
-	const limit = this.getNodeParameter('limit', 0, 50);
-	const onlyOnline = this.getNodeParameter('onlyOnline', 0, false);
-
-	// Get the channel entity
-	const channel = await client.getEntity(channelId);
-
-	// For online members filtering, we need to get all members and filter
-	const users = await withRateLimit(async () =>
-		safeExecute(() =>
-			client.getParticipants(channel, { limit })
-		)
-	);
-
-	let filteredUsers = users;
-
-	if (onlyOnline) {
-		// Filter for online members (this is a basic implementation)
-		// In practice, you might need to check last seen status
-		filteredUsers = users.filter((u: any) => {
-			// Basic online check - you might want to enhance this
-			return u.status?._ === 'UserStatusOnline';
+	let participants: any[] = allParticipants;
+	if (filterAdmins && filterBots) {
+		participants = participants.filter((p: any) => {
+			const u = usersById.get(p.userId?.toString());
+			return u?.bot === true;
 		});
 	}
 
-	const items = filteredUsers.map((u: any) => ({
-		json: {
-			id: u.id?.toString(),
-			username: u.username || null,
-			firstName: u.firstName || '',
-			lastName: u.lastName || '',
-			bot: u.bot || false,
-			isAdmin: u.admin_rights ? true : false,
-			isCreator: u.admin_rights?.isCreator || false,
-			status: u.status?._ || 'Unknown',
-			phone: u.phone || null,
-		},
-	}));
+	if (onlyOnline) {
+		const nowSec = Math.floor(Date.now() / 1000);
+		participants = participants.filter((p: any) => {
+			const u = usersById.get(p.userId?.toString());
+			if (!u?.status) return false;
 
-	return [items];
+			const status = u.status;
+			// Treat explicit online, recently, or statuses with future expires as online
+			if (status._ === 'UserStatusOnline') return true;
+			if (status._ === 'UserStatusRecently') return true;
+			if (typeof status.expires === 'number' && status.expires > nowSec) return true;
+			return false;
+		});
+	}
+
+	if (excludeAdmins) {
+		participants = participants.filter((p: any) => !(p.adminRights || p.isAdmin));
+	}
+
+	if (excludeBots) {
+		participants = participants.filter((p: any) => {
+			const u = usersById.get(p.userId?.toString());
+			return u?.bot !== true;
+		});
+	}
+
+	if (excludeDeletedAndLongAgo) {
+		participants = participants.filter((p: any) => {
+			const u = usersById.get(p.userId?.toString());
+			if (!u) return false;
+			if (u.deleted) return false;
+			const status = u.status;
+			if (!status) return true;
+			if (status._ === 'UserStatusLongAgo') return false;
+			return true;
+		});
+	}
+
+	const items = participants.map((p: any) => {
+		const user = usersById.get(p.userId?.toString()) || {};
+		return {
+			json: {
+				id: user.id?.toString(),
+				username: user.username || null,
+				firstName: user.firstName || '',
+				lastName: user.lastName || '',
+				bot: user.bot || false,
+				isAdmin: !!p.adminRights || !!p.isAdmin,
+				isCreator: !!p.isCreator,
+				status: user.status?._ || 'Unknown',
+				phone: user.phone || null,
+			},
+			pairedItem: { item: i },
+		};
+	});
+
+	return items;
 }
 
-async function addChannelMember(this: IExecuteFunctions, client: any) {
-	const channelId = this.getNodeParameter('channelId', 0);
-	const userIdToAdd = this.getNodeParameter('userIdToAdd', 0);
+async function addChannelMember(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
+	const channelId = this.getNodeParameter('channelId', i);
+	const userIdToAdd = this.getNodeParameter('userIdToAdd', i);
 
 	// Get the channel and user entities
 	const channel = await client.getEntity(channelId);
@@ -145,28 +190,60 @@ async function addChannelMember(this: IExecuteFunctions, client: any) {
 			)
 		);
 
-		return [[{
+		return [{
 			json: {
 				success: true,
 				message: `Successfully added user ${userIdToAdd} to channel ${channelId}`,
 				userId: user.id?.toString(),
 				channelId: channel.id?.toString(),
 			},
-		}]];
+			pairedItem: { item: i },
+		}];
 	} catch (error) {
-		return [[{
+		return [{
 			json: {
 				success: false,
 				error: error instanceof Error ? error.message : String(error),
 				message: `Failed to add user ${userIdToAdd} to channel ${channelId}`,
 			},
-		}]];
+			pairedItem: { item: i },
+		}];
 	}
 }
 
-async function removeChannelMember(this: IExecuteFunctions, client: any) {
-	const channelId = this.getNodeParameter('channelId', 0);
-	const userIdToRemove = this.getNodeParameter('userIdToRemove', 0);
+// Robust channel resolver to handle numeric IDs without access hash and username links
+async function resolveChannelEntity(client: any, rawId: any): Promise<any> {
+	const attempts: any[] = [];
+	const asString = typeof rawId === 'string' ? rawId.trim() : String(rawId);
+
+	// 1) original input
+	attempts.push(asString);
+
+	// 2) if numeric without sign, try -100 prefix (supergroup/channel)
+	if (/^\\d+$/.test(asString) && !asString.startsWith('-')) {
+		attempts.push(`-100${asString}`);
+	}
+
+	// 3) if starts with -100 already, also try without minus for completeness
+	if (asString.startsWith('-100')) {
+		attempts.push(asString.replace('-100', ''));
+	}
+
+	let lastError: any = null;
+	for (const candidate of attempts) {
+		try {
+			return await client.getEntity(candidate);
+		} catch (err) {
+			lastError = err;
+		}
+	}
+
+	throw lastError || new Error('Failed to resolve channel entity');
+}
+
+async function removeChannelMember(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
+	const channelId = this.getNodeParameter('channelId', i);
+	const userIdToRemove = this.getNodeParameter('userIdToRemove', i);
 
 	// Get the channel and user entities
 	const channel = await client.getEntity(channelId);
@@ -198,30 +275,32 @@ async function removeChannelMember(this: IExecuteFunctions, client: any) {
 			)
 		);
 
-		return [[{
+		return [{
 			json: {
 				success: true,
 				message: `Successfully removed user ${userIdToRemove} from channel ${channelId}`,
 				userId: user.id?.toString(),
 				channelId: channel.id?.toString(),
 			},
-		}]];
+			pairedItem: { item: i },
+		}];
 	} catch (error) {
-		return [[{
+		return [{
 			json: {
 				success: false,
 				error: error instanceof Error ? error.message : String(error),
 				message: `Failed to remove user ${userIdToRemove} from channel ${channelId}`,
 			},
-		}]];
+			pairedItem: { item: i },
+		}];
 	}
 }
 
-async function banUser(this: IExecuteFunctions, client: any) {
-	const channelId = this.getNodeParameter('channelId', 0);
-	const userIdToBan = this.getNodeParameter('userIdToBan', 0);
-	const banDuration = this.getNodeParameter('banDuration', 0, 1);
-	const banReason = this.getNodeParameter('banReason', 0, '');
+async function banUser(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
+	const channelId = this.getNodeParameter('channelId', i);
+	const userIdToBan = this.getNodeParameter('userIdToBan', i);
+	const banDuration = this.getNodeParameter('banDuration', i, 1);
+	const banReason = this.getNodeParameter('banReason', i, '');
 
 	// Get the channel and user entities
 	const channel = await client.getEntity(channelId);
@@ -257,7 +336,7 @@ async function banUser(this: IExecuteFunctions, client: any) {
 			)
 		);
 
-		return [[{
+		return [{
 			json: {
 				success: true,
 				message: `Successfully banned user ${userIdToBan} from channel ${channelId} for ${banDuration === 0 ? 'permanent' : banDuration + ' days'}`,
@@ -266,21 +345,23 @@ async function banUser(this: IExecuteFunctions, client: any) {
 				banDuration: banDuration,
 				banReason: banReason || 'No reason provided',
 			},
-		}]];
+			pairedItem: { item: i },
+		}];
 	} catch (error) {
-		return [[{
+		return [{
 			json: {
 				success: false,
 				error: error instanceof Error ? error.message : String(error),
 				message: `Failed to ban user ${userIdToBan} from channel ${channelId}`,
 			},
-		}]];
+			pairedItem: { item: i },
+		}];
 	}
 }
 
-async function unbanUser(this: IExecuteFunctions, client: any) {
-	const channelId = this.getNodeParameter('channelId', 0);
-	const userIdToUnban = this.getNodeParameter('userIdToUnban', 0);
+async function unbanUser(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
+	const channelId = this.getNodeParameter('channelId', i);
+	const userIdToUnban = this.getNodeParameter('userIdToUnban', i);
 
 	// Get the channel and user entities
 	const channel = await client.getEntity(channelId);
@@ -312,44 +393,46 @@ async function unbanUser(this: IExecuteFunctions, client: any) {
 			)
 		);
 
-		return [[{
+		return [{
 			json: {
 				success: true,
 				message: `Successfully unbanned user ${userIdToUnban} from channel ${channelId}`,
 				userId: user.id?.toString(),
 				channelId: channel.id?.toString(),
 			},
-		}]];
+			pairedItem: { item: i },
+		}];
 	} catch (error) {
-		return [[{
+		return [{
 			json: {
 				success: false,
 				error: error instanceof Error ? error.message : String(error),
 				message: `Failed to unban user ${userIdToUnban} from channel ${channelId}`,
 			},
-		}]];
+			pairedItem: { item: i },
+		}];
 	}
 }
 
-async function promoteUser(this: IExecuteFunctions, client: any) {
-	const channelId = this.getNodeParameter('channelId', 0);
-	const userIdToPromote = this.getNodeParameter('userIdToPromote', 0);
-	const adminTitle = String(this.getNodeParameter('adminTitle', 0, 'Admin'));
+async function promoteUser(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
+	const channelId = this.getNodeParameter('channelId', i);
+	const userIdToPromote = this.getNodeParameter('userIdToPromote', i);
+	const adminTitle = String(this.getNodeParameter('adminTitle', i, 'Admin'));
 	
 	// Admin permissions
-	const canChangeInfo = Boolean(this.getNodeParameter('canChangeInfo', 0, false));
-	const canPostMessages = Boolean(this.getNodeParameter('canPostMessages', 0, false));
-	const canEditMessages = Boolean(this.getNodeParameter('canEditMessages', 0, false));
-	const canDeleteMessages = Boolean(this.getNodeParameter('canDeleteMessages', 0, true));
-	const canInviteUsers = Boolean(this.getNodeParameter('canInviteUsers', 0, true));
-	const canRestrictMembers = Boolean(this.getNodeParameter('canRestrictMembers', 0, true));
-	const canPinMessages = Boolean(this.getNodeParameter('canPinMessages', 0, true));
-	const canPromoteMembers = Boolean(this.getNodeParameter('canPromoteMembers', 0, false));
-	const canManageChat = Boolean(this.getNodeParameter('canManageChat', 0, true));
-	const canManageVoiceChats = Boolean(this.getNodeParameter('canManageVoiceChats', 0, true));
-	const canPostStories = Boolean(this.getNodeParameter('canPostStories', 0, false));
-	const canEditStories = Boolean(this.getNodeParameter('canEditStories', 0, false));
-	const canDeleteStories = Boolean(this.getNodeParameter('canDeleteStories', 0, false));
+	const canChangeInfo = Boolean(this.getNodeParameter('canChangeInfo', i, false));
+	const canPostMessages = Boolean(this.getNodeParameter('canPostMessages', i, false));
+	const canEditMessages = Boolean(this.getNodeParameter('canEditMessages', i, false));
+	const canDeleteMessages = Boolean(this.getNodeParameter('canDeleteMessages', i, true));
+	const canInviteUsers = Boolean(this.getNodeParameter('canInviteUsers', i, true));
+	const canRestrictMembers = Boolean(this.getNodeParameter('canRestrictMembers', i, true));
+	const canPinMessages = Boolean(this.getNodeParameter('canPinMessages', i, true));
+	const canPromoteMembers = Boolean(this.getNodeParameter('canPromoteMembers', i, false));
+	const canManageChat = Boolean(this.getNodeParameter('canManageChat', i, true));
+	const canManageVoiceChats = Boolean(this.getNodeParameter('canManageVoiceChats', i, true));
+	const canPostStories = Boolean(this.getNodeParameter('canPostStories', i, false));
+	const canEditStories = Boolean(this.getNodeParameter('canEditStories', i, false));
+	const canDeleteStories = Boolean(this.getNodeParameter('canDeleteStories', i, false));
 
 	// Get the channel and user entities
 	const channel = await client.getEntity(channelId);
@@ -386,7 +469,7 @@ async function promoteUser(this: IExecuteFunctions, client: any) {
 			)
 		);
 
-		return [[{
+		return [{
 			json: {
 				success: true,
 				message: `Successfully promoted user ${userIdToPromote} to admin in channel ${channelId}`,
@@ -409,27 +492,30 @@ async function promoteUser(this: IExecuteFunctions, client: any) {
 					canDeleteStories,
 				},
 			},
-		}]];
+			pairedItem: { item: i },
+		}];
 	} catch (error) {
 		// Enhanced error handling for permission issues
 		const errorMessage = error instanceof Error ? error.message : String(error);
 		
 		if (errorMessage.includes('RIGHT_FORBIDDEN') || errorMessage.includes('CHAT_ADMIN_REQUIRED')) {
-			return [[{
+			return [{
 				json: {
 					success: false,
 					error: "RIGHT_FORBIDDEN: You don't have permission to promote users to admin",
 					message: `You need admin rights with 'addAdmins' permission or be the channel creator to promote users in channel ${channelId}. Original Error: ${errorMessage}`,
 				},
-			}]];
+				pairedItem: { item: i },
+			}];
 		}
 		
-		return [[{
+		return [{
 			json: {
 				success: false,
 				error: errorMessage,
 				message: `Failed to promote user ${userIdToPromote} to admin in channel ${channelId}`,
 			},
-		}]];
+			pairedItem: { item: i },
+		}];
 	}
 }

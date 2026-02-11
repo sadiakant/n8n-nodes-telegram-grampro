@@ -1,9 +1,8 @@
-import { IExecuteFunctions } from 'n8n-workflow';
+import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
 import { getClient } from '../../core/clientManager';
 import { safeExecute } from '../../core/floodWaitHandler';
-import fs from 'fs';
 
-export async function mediaRouter(this: IExecuteFunctions, operation: string) {
+export async function mediaRouter(this: IExecuteFunctions, operation: string, i: number): Promise<INodeExecutionData[]> {
 
 	const creds: any = await this.getCredentials('telegramApi');
 
@@ -16,7 +15,7 @@ export async function mediaRouter(this: IExecuteFunctions, operation: string) {
 	switch (operation) {
 
 		case 'downloadMedia':
-			return downloadMedia.call(this, client);
+			return downloadMedia.call(this, client, i);
 
 		default:
 			throw new Error(`Media operation not supported: ${operation}`);
@@ -25,16 +24,16 @@ export async function mediaRouter(this: IExecuteFunctions, operation: string) {
 
 // ----------------
 
-async function downloadMedia(this: IExecuteFunctions, client: any) {
+async function downloadMedia(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
 
-	const chatId = this.getNodeParameter('chatId', 0);
-	const messageId = this.getNodeParameter('messageId', 0);
+	const chatId = this.getNodeParameter('chatId', i);
+	const messageId = this.getNodeParameter('messageId', i);
 
 	const msg = await safeExecute(() =>
 		client.getMessages(chatId, { ids: [messageId] }),
-	);
+	) as any[];
 
-	const message = msg[0];
+	const message: any = msg[0];
 
 	if (!message?.media) {
 		throw new Error('No media found in message');
@@ -42,17 +41,35 @@ async function downloadMedia(this: IExecuteFunctions, client: any) {
 
 	const buffer = await safeExecute(() =>
 		client.downloadMedia(message.media),
-	);
+	) as Buffer;
 
-	const filePath = `./telegram_media_${Date.now()}`;
+	// Determine mime type and file name
+	let mimeType = 'application/octet-stream';
+	let fileName = `file_${Date.now()}`;
 
-	fs.writeFileSync(filePath, buffer);
+	if (message.media.document) {
+		mimeType = message.media.document.mimeType || mimeType;
+		const filenameAttr = message.media.document.attributes?.find((a: any) => a.className === 'DocumentAttributeFilename');
+		if (filenameAttr) fileName = filenameAttr.fileName;
+	} else if (message.media.photo) {
+		mimeType = 'image/jpeg';
+		fileName = `photo_${Date.now()}.jpg`;
+	}
 
-	return [[{
+	return [{
 		json: {
-			filePath,
-			size: buffer.length,
 			success: true,
+			fileName,
+			mimeType,
+			size: buffer.length
 		},
-	}]];
+		binary: {
+			data: {
+				data: buffer.toString('base64'),
+				mimeType,
+				fileName,
+			}
+		},
+		pairedItem: { item: i },
+	}];
 }
