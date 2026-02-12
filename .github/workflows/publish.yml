@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Provenance aur OIDC ke liye zaroori hai
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,25 +32,48 @@ jobs:
 
       - name: Smart Publish Logic
         run: |
-          # 1. Get package name and local version from package.json
+          # 1. Variables setup
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           LOCAL_VERSION=$(node -p "require('./package.json').version")
           
-          # 2. Get the latest version already published on NPM
-          # If the package is new, we fallback to 0.0.0
+          # NPM se current version check karna (0.0.0 agar package naya hai)
           REMOTE_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
           
-          echo "Local Version: $LOCAL_VERSION"
-          echo "Remote (NPM) Version: $REMOTE_VERSION"
+          echo "🔍 Checking Versions..."
+          echo "📍 Local: $LOCAL_VERSION"
+          echo "🌐 Remote: $REMOTE_VERSION"
 
-          # 3. Compare versions
-          if [ "$LOCAL_VERSION" != "$REMOTE_VERSION" ]; then
-            echo "🚀 Version bump detected ($REMOTE_VERSION -> $LOCAL_VERSION). Publishing to LATEST..."
+          # 2. Version Comparison Logic using Node.js (Very Accurate)
+          # Isme hum check karenge ki Local version Remote se bada hai, barabar hai ya chhota.
+          STATUS=$(node -e "
+            const local = '$LOCAL_VERSION'.split('.').map(Number);
+            const remote = '$REMOTE_VERSION'.split('.').map(Number);
+            
+            let result = 'EQUAL';
+            for (let i = 0; i < 3; i++) {
+              if (local[i] > (remote[i] || 0)) { result = 'GREATER'; break; }
+              if (local[i] < (remote[i] || 0)) { result = 'SMALLER'; break; }
+            }
+            console.log(result);
+          ")
+
+          # 3. Decision Tree
+          if [ "$STATUS" == "GREATER" ]; then
+            echo "🚀 NEW VERSION DETECTED! Publishing to @latest..."
             npm publish --provenance
-          else
-            echo "🛠️ No version bump. Publishing daily build to DEV tag..."
-            # Create timestamped dev version: e.g. 2.0.0-dev.202402121530
-            DEV_VERSION="${LOCAL_VERSION}-dev.$(date +%Y%m%d%H%M%S)"
+
+          elif [ "$STATUS" == "EQUAL" ]; then
+            echo "🛠️ DAILY UPDATE DETECTED. Publishing to @dev..."
+            # Custom Timestamp: 13Feb2026.0807PM
+            TIMESTAMP=$(date +%d%b%Y.%I%M%p)
+            DEV_VERSION="${LOCAL_VERSION}-dev.${TIMESTAMP}"
+            
             npm version $DEV_VERSION --no-git-tag-version
             npm publish --tag dev --provenance
+            echo "✅ Published version $DEV_VERSION with tag @dev"
+
+          else
+            echo "❌ ERROR: Local version ($LOCAL_VERSION) is lower than NPM version ($REMOTE_VERSION)."
+            echo "Aapne galti se version piche kar diya hai. Please check package.json."
+            exit 1
           fi
