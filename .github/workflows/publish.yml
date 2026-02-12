@@ -1,16 +1,16 @@
 name: Publish to NPM
+
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*' ]
-  workflow_dispatch: # <--- This adds the manual "Run workflow" button
+  workflow_dispatch:
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # Essential for OIDC
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,7 +21,6 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org/
 
-      # 1. Force update npm to ensure the latest OIDC logic is used
       - name: Update npm
         run: npm install -g npm@latest
 
@@ -31,6 +30,27 @@ jobs:
       - name: Build project
         run: npm run build
 
-      # 2. Publish using the environment's id-token
-      - name: Publish to npm
-        run: npm publish --provenance
+      - name: Smart Publish Logic
+        run: |
+          # 1. Get package name and local version from package.json
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          
+          # 2. Get the latest version already published on NPM
+          # If the package is new, we fallback to 0.0.0
+          REMOTE_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+          
+          echo "Local Version: $LOCAL_VERSION"
+          echo "Remote (NPM) Version: $REMOTE_VERSION"
+
+          # 3. Compare versions
+          if [ "$LOCAL_VERSION" != "$REMOTE_VERSION" ]; then
+            echo "🚀 Version bump detected ($REMOTE_VERSION -> $LOCAL_VERSION). Publishing to LATEST..."
+            npm publish --provenance
+          else
+            echo "🛠️ No version bump. Publishing daily build to DEV tag..."
+            # Create timestamped dev version: e.g. 2.0.0-dev.202402121530
+            DEV_VERSION="${LOCAL_VERSION}-dev.$(date +%Y%m%d%H%M%S)"
+            npm version $DEV_VERSION --no-git-tag-version
+            npm publish --tag dev --provenance
+          fi
