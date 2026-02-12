@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "big-integer": "^1.6.52",
-    "n8n-workflow": "^2.3.2",
+    "n8n-workflow": "^2.6.1",
     "telegram": "^2.26.22"
   },
   "devDependencies": {
