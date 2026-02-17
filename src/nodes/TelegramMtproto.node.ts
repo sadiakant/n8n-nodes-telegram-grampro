@@ -1,5 +1,11 @@
-import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
-import { INodeType, INodeTypeDescription, NodeOperationError } from 'n8n-workflow';
+import {
+	IExecuteFunctions,
+	INodeExecutionData,
+	INodeType,
+	INodeTypeDescription,
+	NodeOperationError,
+} from 'n8n-workflow';
+import { testTelegramApi } from '../credentials/TelegramApi.credentials';
 
 import { messageRouter } from './resources/message.operations';
 import { chatRouter } from './resources/chat.operations';
@@ -24,6 +30,7 @@ export class TelegramMtproto implements INodeType {
 			{
 				name: 'telegramApi',
 				required: true,
+				testedBy: 'testTelegramApi',
 				displayOptions: {
 					hide: {
 						resource: ['authentication'],
@@ -107,6 +114,19 @@ export class TelegramMtproto implements INodeType {
 					},
 				},
 				description: 'Maximum number of chats to return',
+			},
+			{
+				displayName: 'Group by Folders',
+				name: 'groupByFolders',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						resource: ['chat'],
+						operation: ['getDialogs'],
+					},
+				},
+				description: 'Whether to group chats by their Telegram folders (Dialog Filters)',
 			},
 
 			// USER OPS
@@ -675,18 +695,18 @@ export class TelegramMtproto implements INodeType {
 				description: 'The media to edit the message with (InputMedia type)',
 			},
 			{
-                displayName: 'Caption',
-                name: 'caption',
-                type: 'string',
-                default: '',
-                displayOptions: {
-                    show: {
-                        resource: ['message'],
-                        operation: ['editMessageMedia'],
-                    },
-                },
-                description: 'New caption for the media. If left empty, the original caption will be preserved.',
-            },
+				displayName: 'Caption',
+				name: 'caption',
+				type: 'string',
+				default: '',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['editMessageMedia'],
+					},
+				},
+				description: 'New caption for the media. If left empty, the original caption will be preserved.',
+			},
 			{
 				displayName: 'Caption Entities',
 				name: 'captionEntities',
@@ -1497,6 +1517,13 @@ export class TelegramMtproto implements INodeType {
 		],
 	};
 
+	methods = {
+		credentialTest: {
+			testTelegramApi,
+		},
+	};
+
+	// eslint-disable-next-line no-unused-vars
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];

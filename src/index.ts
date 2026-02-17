@@ -7,3 +7,4 @@ export * from './core/sessionEncryption';
 export * from './core/floodWaitHandler';
 export * from './core/rateLimiter';
 export * from './core/logger';
+export * from './core/telegramErrorMapper';

@@ -1,15 +1,17 @@
 {
   "name": "n8n-nodes-telegram-grampro",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Telegram GramPro production nodes for n8n",
   "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "node esbuild.config.mjs && node copy-assets.mjs",
+    "lint": "n8n-node lint",
+    "lint:fix": "n8n-node lint --fix",
     "dev": "node esbuild.config.mjs --watch",
-    "prepare": "npm run build",
-    "prepublishOnly": "npm run build"
+    "n8n-scan": "npx @n8n/scan-community-package .",
+    "prepare": "npm run build"
   },
   "keywords": [
     "n8n",
@@ -22,7 +24,6 @@
     "automation",
     "workflow",
     "n8n-community-node-package"
-
   ],
   "author": {
     "name": "sadiakant",
@@ -37,15 +38,22 @@
     "url": "https://github.com/sadiakant/n8n-nodes-telegram-grampro/issues"
   },
   "dependencies": {
-    "big-integer": "^1.6.52",
-    "n8n-workflow": "^2.6.1",
-    "telegram": "^2.26.22"
+    "n8n-workflow": "*"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
-    "esbuild": "^0.27.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "@eslint/js": "^9.10.0",
+    "@n8n/node-cli": "^0.20.0",
+    "@types/crypto-js": "^4.2.2",
+    "@types/node": "^20.19.33",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.10.0",
+    "globals": "^15.0.0",
+    "telegram": "^2.26.22",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.0.0"
   },
   "n8n": {
     "nodes": [
@@ -62,10 +70,8 @@
   "engines": {
     "node": ">=16.0.0"
   },
-  
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
   }
-  
 }

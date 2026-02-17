@@ -13,12 +13,14 @@ export async function userRouter(this: IExecuteFunctions, operation: string, i: 
         creds.session,
     );
 
+    const cacheScope = buildCacheScope(creds);
+
     switch (operation) {
         case 'getMe':
-            return getMe.call(this, client, i);
+            return getMeScoped.call(this, client, i, cacheScope);
 
         case 'getFullUser':
-            return getFullUser.call(this, client, i);
+            return getFullUserScoped.call(this, client, i, cacheScope);
 
         case 'updateProfile':
             return updateProfile.call(this, client, i);
@@ -37,7 +39,16 @@ export async function userRouter(this: IExecuteFunctions, operation: string, i: 
 // ----------------------
 
 export async function getMe(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
-    const cacheKey = 'me';
+    return getMeScoped.call(this, client, i, 'global');
+}
+
+export async function getMeScoped(
+    this: IExecuteFunctions,
+    client: any,
+    i: number,
+    cacheScope: string,
+): Promise<INodeExecutionData[]> {
+    const cacheKey = `me:${cacheScope}`;
     const cachedMe = cache.get(cacheKey);
     if (cachedMe) {
         return [{
@@ -75,9 +86,18 @@ export async function getMe(this: IExecuteFunctions, client: any, i: number): Pr
 
 
 export async function getFullUser(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
+    return getFullUserScoped.call(this, client, i, 'global');
+}
+
+export async function getFullUserScoped(
+    this: IExecuteFunctions,
+    client: any,
+    i: number,
+    cacheScope: string,
+): Promise<INodeExecutionData[]> {
     const userId = this.getNodeParameter('userId', i) as string;
 
-    const cacheKey = CacheKeys.getUser(userId);
+    const cacheKey = `${CacheKeys.getUser(userId)}:${cacheScope}`;
     const cachedUser = cache.get(cacheKey);
     if (cachedUser) {
         return [{
@@ -119,6 +139,13 @@ export async function getFullUser(this: IExecuteFunctions, client: any, i: numbe
         json,
         pairedItem: { item: i },
     }];
+}
+
+function buildCacheScope(creds: Record<string, unknown>): string {
+    const apiId = creds.apiId ? String(creds.apiId) : 'no-api-id';
+    const session = typeof creds.session === 'string' ? creds.session : '';
+    const tail = session.length >= 8 ? session.slice(-8) : session || 'no-session';
+    return `${apiId}:${tail}`;
 }
 
 export async function updateProfile(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {

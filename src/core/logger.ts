@@ -10,8 +10,7 @@ const levelMap = {
 
 type LogLevel = keyof typeof levelMap;
 
-const resolvedEnvLevel = (process.env.GRAMPRO_LOG_LEVEL || process.env.N8N_LOG_LEVEL || 'warn').toLowerCase();
-const resolvedLevel: LogLevel = (resolvedEnvLevel in levelMap ? resolvedEnvLevel : 'warn') as LogLevel;
+const resolvedLevel: LogLevel = "warn"; // Default to warn for production compliance
 const currentLevel: number = levelMap[resolvedLevel];
 
 function shouldLog(level: LogLevel) {
@@ -25,7 +24,7 @@ export const logger = {
    * @param context Optional context object
    */
   info: (message: string, context?: any): void => {
-    if (!shouldLog('info')) return;
+    if (!shouldLog("info")) return;
     console.log(`[INFO] ${new Date().toISOString()} - ${message}`);
     if (context) {
       console.log(JSON.stringify(context, null, 2));
@@ -38,7 +37,7 @@ export const logger = {
    * @param context Optional context object
    */
   warn: (message: string, context?: any): void => {
-    if (!shouldLog('warn')) return;
+    if (!shouldLog("warn")) return;
     console.warn(`[WARN] ${new Date().toISOString()} - ${message}`);
     if (context) {
       console.warn(JSON.stringify(context, null, 2));
@@ -51,7 +50,7 @@ export const logger = {
    * @param context Optional context object
    */
   error: (message: string, context?: any): void => {
-    if (!shouldLog('error')) return;
+    if (!shouldLog("error")) return;
     console.error(`[ERROR] ${new Date().toISOString()} - ${message}`);
     if (context) {
       console.error(JSON.stringify(context, null, 2));
@@ -65,11 +64,9 @@ export const logger = {
    */
   debug: (message: string, context?: any): void => {
     if (!shouldLog('debug')) return;
-    if (process.env.NODE_ENV !== 'production') {
-      console.debug(`[DEBUG] ${new Date().toISOString()} - ${message}`);
-      if (context) {
-        console.debug(JSON.stringify(context, null, 2));
-      }
+    console.debug(`[DEBUG] ${new Date().toISOString()} - ${message}`);
+    if (context) {
+      console.debug(JSON.stringify(context, null, 2));
     }
-  }
+  },
 };

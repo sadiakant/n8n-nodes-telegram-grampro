@@ -867,3 +867,18 @@ When seeking help, include:
 - Use enhanced validation features
 
 This comprehensive troubleshooting guide should help you resolve most issues with Telegram GramPro, including all new features and enhanced capabilities. If problems persist, consult the support channels or create a detailed issue report.
+## Telegram Error Code Mapping (Updated)
+
+The node now maps Telegram raw MTProto errors to user-friendly messages in both credential verification and runtime operations.
+
+### Authentication and Session
+- AUTH_KEY_UNREGISTERED, AUTH_KEY_DUPLICATED, SESSION_REVOKED, SESSION_EXPIRED, SESSION_PASSWORD_NEEDED
+
+### Rate Limit and Network
+- FLOOD_WAIT_X, PEER_FLOOD, NETWORK_TIMEOUT, ETIMEDOUT
+
+### Permission and Access
+- CHAT_WRITE_FORBIDDEN, USER_BANNED_IN_CHANNEL, USER_PRIVACY_RESTRICTED, CHANNEL_PRIVATE, CHAT_ADMIN_REQUIRED, CHAT_FORWARDS_RESTRICTED
+
+### Entity/Input Problems
+- USERNAME_NOT_OCCUPIED, USERNAME_INVALID, USERNAME_OCCUPIED, INVITE_HASH_INVALID, INVITE_HASH_EXPIRED, PEER_ID_INVALID, MESSAGE_ID_INVALID, INPUT_USER_DEACTIVATED

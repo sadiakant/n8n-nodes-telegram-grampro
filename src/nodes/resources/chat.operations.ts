@@ -2,7 +2,7 @@ import { IExecuteFunctions, INodeExecutionData, IDataObject } from 'n8n-workflow
 import { getClient } from '../../core/clientManager';
 import { safeExecute } from '../../core/floodWaitHandler';
 import { Api } from 'telegram';
-import bigInt from 'big-integer';
+
 import { cache, CacheKeys } from '../../core/cache';
 
 export async function chatRouter(this: IExecuteFunctions, operation: string, i: number): Promise<INodeExecutionData[]> {
@@ -61,12 +61,13 @@ async function getChat(this: IExecuteFunctions, client: any, i: number): Promise
 
 // ----------------------
 async function getDialogs(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
-
     const rawLimit = this.getNodeParameter('limit', i, null) as number | null;
-    const targetLimit = (typeof rawLimit === 'number' && !isNaN(rawLimit)) ? rawLimit : Infinity;
+    let targetLimit = (typeof rawLimit === 'number' && !isNaN(rawLimit) && rawLimit > 0) ? rawLimit : Infinity;
+    const groupByFolders = this.getNodeParameter('groupByFolders', i, false) as boolean;
+
 
     // Avoid caching when unbounded or very large
-    const useCache = targetLimit !== Infinity && targetLimit <= 500;
+    const useCache = targetLimit !== Infinity && targetLimit <= 500 && !groupByFolders;
     const cacheKey = CacheKeys.getDialogs(targetLimit === Infinity ? -1 : targetLimit);
     if (useCache) {
         const cachedDialogs = cache.get(cacheKey);
@@ -78,10 +79,26 @@ async function getDialogs(this: IExecuteFunctions, client: any, i: number): Prom
         }
     }
 
+    // Fetch folders/filters if grouping is requested
+    let filters: any[] = [];
+    if (groupByFolders) {
+        try {
+            const res: any = await client.invoke(new Api.messages.GetDialogFilters());
+            filters = Array.isArray(res) ? res : (res?.filters || []);
+        } catch {
+            filters = [];
+        }
+    }
+
     const items: INodeExecutionData[] = [];
+    const allChats: IDataObject[] = [];
     let count = 0;
 
-    for await (const dialog of client.iterDialogs({ limit: targetLimit === Infinity ? undefined : targetLimit })) {
+    const dialogs: any[] = await client.getDialogs({
+        limit: targetLimit === Infinity ? undefined : targetLimit,
+    });
+
+    for (const dialog of dialogs) {
         if (targetLimit !== Infinity && count >= targetLimit) break;
 
         const entity = dialog.entity || dialog;
@@ -99,25 +116,127 @@ async function getDialogs(this: IExecuteFunctions, client: any, i: number): Prom
         const audience = entity.participantsCount ?? entity.participantCount ?? dialog.participantsCount ?? null;
 
         const createDate = entity.date ? formatDate(new Date(entity.date * 1000)) : null;
-        // Telegram dialogs do not expose reliable join timestamps; avoid misleading values.
         const joinedDate = null;
 
-        items.push({
-            json: {
-                id,
-                title,
-                username,
-                account_type: accountType,
-                type: visibility,
-                audience,
-                joinedDate,
-                createDate,
-                unread: dialog.unreadCount ?? 0,
-            } as IDataObject,
-            pairedItem: { item: i },
-        });
+        const chatJson: IDataObject = {
+            id,
+            title,
+            username,
+            account_type: accountType,
+            type: visibility,
+            audience,
+            joinedDate,
+            createDate,
+            unread: dialog.unreadCount ?? 0,
+        };
+
+        if (groupByFolders) {
+            allChats.push(chatJson);
+        } else {
+            items.push({
+                json: chatJson,
+                pairedItem: { item: i },
+            });
+        }
 
         count++;
+    }
+
+    if (groupByFolders) {
+        const groupedResults: INodeExecutionData[] = [];
+        const assignedChatIds = new Set<string>();
+
+        // Helper to match chat ID with a peer
+        const matchPeer = (peer: any, chatId: string) => {
+            if (!peer) return false;
+            const peerId = peer.userId || peer.chatId || peer.channelId;
+            return peerId?.toString() === chatId;
+        };
+
+        for (const filter of filters) {
+            if (filter.className === 'DialogFilterDefault') continue;
+
+            let folderNameRaw = filter.title || `Folder ${filter.id}`;
+            if (typeof folderNameRaw === 'object' && (folderNameRaw as any).text) {
+                folderNameRaw = (folderNameRaw as any).text;
+            }
+            const folderName = String(folderNameRaw);
+
+            // Normalize folder name to a safe key for n8n expressions (alphanumeric only)
+            const safeKey = folderName.replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '') || `folder_${filter.id}`;
+
+            const folderChats: IDataObject[] = [];
+
+            // A folder includes peers explicitly or by type flags
+            for (const chat of allChats) {
+                let included = false;
+                const chatIdStr = chat.id as string;
+
+                // 1. Check explicit inclusions
+                if (filter.includePeers) {
+                    for (const peer of filter.includePeers) {
+                        if (matchPeer(peer, chatIdStr)) {
+                            included = true;
+                            break;
+                        }
+                    }
+                }
+
+                // 2. Check type flags if not explicitly included
+                if (!included) {
+                    const accType = chat.account_type as string;
+                    if (filter.contacts && accType === 'user') included = true;
+                    if (filter.nonContacts && accType === 'user') included = true;
+                    if (filter.groups && accType === 'group') included = true;
+                    if (filter.broadcasts && accType === 'channel') included = true;
+                    if (filter.bots && accType === 'bot') included = true;
+                }
+
+                // 3. Check explicit exclusions
+                if (included && filter.excludePeers) {
+                    for (const peer of filter.excludePeers) {
+                        if (matchPeer(peer, chatIdStr)) {
+                            included = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (included) {
+                    folderChats.push(chat);
+                    assignedChatIds.add(chatIdStr);
+                }
+            }
+
+            if (folderChats.length > 0) {
+                groupedResults.push({
+                    json: {
+                        [safeKey]: folderChats,
+                        folder_name: folderName,
+                    },
+                    pairedItem: { item: i },
+                });
+            }
+        }
+
+        // Add "Other" folder for chats not in any folder
+        const otherChats = allChats.filter(chat => !assignedChatIds.has(chat.id as string));
+        if (otherChats.length > 0) {
+            groupedResults.push({
+                json: {
+                    Other: otherChats,
+                    folder_name: 'Other',
+                },
+                pairedItem: { item: i },
+            });
+        }
+
+        // If no grouping was possible, return flat list
+        if (groupedResults.length === 0) {
+            return allChats.map(chat => ({ json: chat, pairedItem: { item: i } }));
+        }
+
+        return groupedResults;
     }
 
     if (useCache) {
@@ -176,38 +295,13 @@ async function joinChat(this: IExecuteFunctions, client: any, i: number): Promis
         try {
             const numericId = normalizeIdForGroup(chatId);
             return await client.invoke(new Api.messages.AddChatUser({
-                chatId: bigInt(numericId),
+                chatId: BigInt(numericId) as any,
                 userId: 'me',
                 fwdLimit: 0
             }));
-        } catch (error) {
+        } catch {
             // Fallback to channel/supergroup join
             return await client.invoke(new Api.channels.JoinChannel({ channel: chatId }));
-        }
-    });
-
-    return [{
-        json: { success: true, result: result as any } as IDataObject,
-        pairedItem: { item: i },
-    }];
-}
-
-async function leaveGroup(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
-    const chatId = this.getNodeParameter('chatId', i) as string;
-
-    const result: any = await safeExecute(async () => {
-        try {
-            // Try to leave as a basic group first
-            const numericId = normalizeIdForGroup(chatId);
-            return await client.invoke(new Api.messages.DeleteChatUser({
-                chatId: bigInt(numericId),
-                userId: 'me'
-            }));
-        } catch (error) {
-            // If that fails, try as a supergroup/channel
-            return await client.invoke(new Api.channels.LeaveChannel({
-                channel: chatId
-            }));
         }
     });
 
@@ -223,11 +317,11 @@ async function leaveChat(this: IExecuteFunctions, client: any, i: number): Promi
     const result: any = await safeExecute(async () => {
         try {
             return await client.invoke(new Api.channels.LeaveChannel({ channel: chatId }));
-        } catch (error) {
+        } catch {
             // Try basic group leave
             const numericId = normalizeIdForGroup(chatId);
             return await client.invoke(new Api.messages.DeleteChatUser({
-                chatId: bigInt(numericId),
+                chatId: BigInt(numericId) as any,
                 userId: 'me'
             }));
         }
@@ -260,7 +354,7 @@ async function createChat(this: IExecuteFunctions, client: any, i: number): Prom
         const peer = await client.getEntity(chat.id);
         const invite = await client.invoke(new Api.messages.ExportChatInvite({ peer }));
         inviteLink = (invite as any).link || null;
-    } catch (_) { inviteLink = null; }
+    } catch { inviteLink = null; }
 
     const createdAt = chat.date ? new Date(chat.date * 1000) : null;
     const formattedDate = createdAt ? formatDateWithTime(createdAt) : null;
@@ -303,7 +397,7 @@ async function createChannel(this: IExecuteFunctions, client: any, i: number): P
         const peer = await client.getEntity(chat.id);
         const invite = await client.invoke(new Api.messages.ExportChatInvite({ peer }));
         inviteLink = (invite as any).link || null;
-    } catch (_) { inviteLink = null; }
+    } catch { inviteLink = null; }
 
     const createdAt = chat.date ? new Date(chat.date * 1000) : null;
     const formattedDate = createdAt ? formatDateWithTime(createdAt) : null;

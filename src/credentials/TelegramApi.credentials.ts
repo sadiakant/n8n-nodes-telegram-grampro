@@ -1,5 +1,14 @@
-import { ICredentialType, INodeProperties } from 'n8n-workflow';
-import { SessionEncryption } from '../core/sessionEncryption';
+import {
+  ICredentialType,
+  INodeProperties,
+  ICredentialTestRequest,
+  INodeCredentialTestResult,
+  ICredentialsDecrypted,
+  ICredentialDataDecryptedObject,
+  IHttpRequestOptions,
+} from 'n8n-workflow';
+import { getClient } from '../core/clientManager';
+import { mapTelegramError } from '../core/telegramErrorMapper';
 
 export class TelegramApi implements ICredentialType {
   name = 'telegramApi';
@@ -60,43 +69,104 @@ export class TelegramApi implements ICredentialType {
     },
   ];
 
-  /**
-   * Encrypt session string before storing
-   */
-  async authenticate(credentials: any): Promise<any> {
-    try {
-      // Generate a secure encryption key based on API credentials
-      const encryptionKey = this.generateEncryptionKey(credentials.apiId, credentials.apiHash);
+  test: ICredentialTestRequest = {
+    request: {
+      method: 'GET',
+      url: 'https://telegram.org',
+      ignoreHttpStatusErrors: true,
+    },
+  };
 
-      // Encrypt the session string if it's not already encrypted
-      if (credentials.session && !SessionEncryption.isEncryptedSession(credentials.session)) {
-        credentials.session = SessionEncryption.encryptSession(credentials.session, encryptionKey);
+  authenticate = async (
+    credentials: ICredentialDataDecryptedObject,
+    requestOptions: IHttpRequestOptions,
+  ): Promise<IHttpRequestOptions> => {
+    const apiIdRaw = credentials.apiId;
+    const apiId = typeof apiIdRaw === 'string' ? Number(apiIdRaw) : apiIdRaw as number | undefined;
+    const apiHash = credentials.apiHash as string | undefined;
+    const session = credentials.session as string | undefined;
+
+    if (!apiId || !apiHash) {
+      throw new Error('API ID and API Hash are required');
+    }
+
+    if (!session || !session.trim()) {
+      throw new Error('Session String is required. Run Auth > Complete Login first.');
+    }
+
+    try {
+      const client = await getClient(apiId, apiHash, session);
+      if (!client) {
+        throw new Error('Failed to initialize Telegram client');
       }
+      const me = await client.getMe();
 
-      return credentials;
+      if (!me) {
+        throw new Error('Could not verify account identity with getMe');
+      }
     } catch (error) {
-      throw new Error(`Session encryption failed: ${error instanceof Error ? error.message : String(error)}`);
+      const mapped = mapTelegramError(error);
+      throw new Error(`getMe verification failed: ${mapped.userMessage}`);
     }
-  }
 
-  /**
-   * Decrypt session string for use
-   */
-  async decryptSession(encryptedSession: string, apiId: number, apiHash: string): Promise<string> {
-    try {
-      const encryptionKey = this.generateEncryptionKey(apiId, apiHash);
-      return SessionEncryption.decryptSession(encryptedSession, encryptionKey);
-    } catch (error) {
-      throw new Error(`Session decryption failed: ${error instanceof Error ? error.message : String(error)}`);
+    return requestOptions;
+  };
+}
+
+/**
+ * Programmatic test connection using MTProto getMe
+ * Exported for use in node credentialTest methods
+ */
+export async function testTelegramApi(
+  this: unknown,
+  credential: ICredentialsDecrypted<ICredentialDataDecryptedObject> | Record<string, unknown>,
+): Promise<INodeCredentialTestResult> {
+  try {
+    const credentials = (
+      'data' in credential ? credential.data : credential
+    ) as Record<string, unknown> | undefined;
+
+    const apiIdRaw = credentials?.apiId;
+    const apiId = typeof apiIdRaw === 'string' ? Number(apiIdRaw) : apiIdRaw as number | undefined;
+    const apiHash = credentials?.apiHash as string | undefined;
+    const session = credentials?.session as string | undefined;
+
+    if (!apiId || !apiHash) {
+      return {
+        status: 'Error',
+        message: 'API ID and API Hash are required',
+      };
     }
-  }
 
-  /**
-   * Generate encryption key from API credentials
-   */
-  private generateEncryptionKey(apiId: number, apiHash: string): string {
-    const crypto = require('crypto');
-    const combined = `${apiId}:${apiHash}`;
-    return crypto.createHash('sha256').update(combined).digest('hex').substring(0, 32);
+    const client = await getClient(apiId, apiHash, session ?? '');
+    if (!client) {
+      return {
+        status: 'Error',
+        message: 'Failed to initialize Telegram client',
+      };
+    }
+
+    const me = await client.getMe();
+    if (!me) {
+      return {
+        status: 'Error',
+        message: 'getMe Operation Error: Could not verify account identity',
+      };
+    }
+
+    const fullName = `${me.firstName ?? ''}${me.lastName ? ` ${me.lastName}` : ''}`.trim() || 'Unknown';
+    const username = me.username ? `@${me.username}` : 'no-username';
+    const userId = me.id ? me.id.toString() : 'unknown-id';
+
+    return {
+      status: 'OK',
+      message: `Connection tested successfully. Username: ${username}, UserID: ${userId}, Name: ${fullName}`,
+    };
+  } catch (error) {
+    const mapped = mapTelegramError(error);
+    return {
+      status: 'Error',
+      message: `getMe Operation Error: ${mapped.userMessage}`,
+    };
   }
 }

@@ -3,6 +3,7 @@ import { StringSession } from 'telegram/sessions';
 import { LogLevel } from 'telegram/extensions/Logger';
 import { logger } from './logger';
 import { SessionEncryption } from './sessionEncryption';
+import * as crypto from 'crypto';
 
 // Store active clients
 const clients = new Map<string, TelegramClient>();
@@ -16,24 +17,24 @@ const MAX_CONNECTION_AGE = 30 * 60 * 1000; // 30 minutes
 
 // Automatic cleanup of stale connections
 setInterval(() => {
-  cleanupStaleConnections();
+    cleanupStaleConnections();
 }, CLEANUP_INTERVAL);
 
 function cleanupStaleConnections(): void {
-  const now = Date.now();
-  const staleKeys: string[] = [];
-  
-  for (const [key, timestamp] of connectionTimestamps.entries()) {
-    if (now - timestamp > MAX_CONNECTION_AGE) {
-      staleKeys.push(key);
+    const now = Date.now();
+    const staleKeys: string[] = [];
+
+    for (const [key, timestamp] of connectionTimestamps.entries()) {
+        if (now - timestamp > MAX_CONNECTION_AGE) {
+            staleKeys.push(key);
+        }
     }
-  }
-  
-  for (const key of staleKeys) {
-    connectionLocks.delete(key);
-    connectionTimestamps.delete(key);
-    logger.debug(`[ClientManager] Cleaned up stale connection lock: ${key}`);
-  }
+
+    for (const key of staleKeys) {
+        connectionLocks.delete(key);
+        connectionTimestamps.delete(key);
+        logger.debug(`[ClientManager] Cleaned up stale connection lock: ${key}`);
+    }
 }
 
 export async function getClient(apiId: number | string, apiHash: string, session: string) {
@@ -50,7 +51,7 @@ export async function getClient(apiId: number | string, apiHash: string, session
     // 2. Check if we have a cached client
     if (clients.has(key)) {
         const existingClient = clients.get(key)!;
-        
+
         // Quick Health Check
         if (existingClient.connected) {
             return existingClient;
@@ -61,7 +62,7 @@ export async function getClient(apiId: number | string, apiHash: string, session
         try {
             await existingClient.connect();
             return existingClient;
-        } catch (e) {
+        } catch {
             logger.error(`[ClientManager] Heal failed for ${numericApiId}. Destroying and recreating.`);
             await gracefulDestroy(existingClient);
             clients.delete(key);
@@ -71,16 +72,15 @@ export async function getClient(apiId: number | string, apiHash: string, session
     // 3. Create a new Connection (Protected by a Lock)
     const connectPromise = (async () => {
         logger.info(`[ClientManager] Initializing new client for ${numericApiId}...`);
-        
+
         // Decrypt session if it's encrypted
         let decryptedSession = session;
         if (SessionEncryption.isEncryptedSession(session)) {
             try {
                 // Generate encryption key from API credentials
-                const crypto = require('crypto');
                 const combined = `${numericApiId}:${apiHash}`;
                 const encryptionKey = crypto.createHash('sha256').update(combined).digest('hex').substring(0, 32);
-                
+
                 decryptedSession = SessionEncryption.decryptSession(session, encryptionKey);
                 logger.debug(`[ClientManager] Session decrypted successfully for ${numericApiId}`);
             } catch (error) {
@@ -88,7 +88,7 @@ export async function getClient(apiId: number | string, apiHash: string, session
                 throw new Error(`Session decryption failed: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
-        
+
         const stringSession = new StringSession(decryptedSession);
         const client = new TelegramClient(stringSession, numericApiId, apiHash, {
             connectionRetries: 5,
@@ -99,11 +99,11 @@ export async function getClient(apiId: number | string, apiHash: string, session
 
         try {
             await client.connect();
-            
+
             // 4. Validate the connection actually works (Ping)
             // We use 'getMe' as a lightweight verification that we are authorized and socket is alive
             await client.getMe();
-            
+
             logger.info(`[ClientManager] Connection established for ${numericApiId}`);
             clients.set(key, client);
             return client;
@@ -122,7 +122,7 @@ export async function getClient(apiId: number | string, apiHash: string, session
     // Set the lock and track timestamp
     connectionLocks.set(key, connectPromise);
     connectionTimestamps.set(key, Date.now());
-    
+
     return await connectPromise;
 }
 
@@ -133,10 +133,12 @@ async function gracefulDestroy(client: TelegramClient) {
     try {
         await client.disconnect();
         await client.destroy();
-    } catch (e) { 
+    } catch {
         // Ignore destruction errors
     }
 }
+
+
 
 /**
  * Gracefully disconnect and clean up a client
@@ -157,7 +159,7 @@ export async function disconnectClient(apiId: number, session: string): Promise<
 export async function cleanupAllClients(): Promise<void> {
     logger.info('[ClientManager] Cleaning up all Telegram clients...');
     const promises = [];
-    for (const [key, client] of clients) {
+    for (const client of clients.values()) {
         promises.push(gracefulDestroy(client));
     }
     await Promise.all(promises);

@@ -10,17 +10,23 @@ import { withRateLimit } from './rateLimiter';
 export abstract class BaseOperation {
   protected client!: TelegramClient;
 
+  protected context: IExecuteFunctions;
+  protected operation: string;
+
   constructor(
-    protected context: IExecuteFunctions,
-    protected operation: string
-  ) {}
+    context: IExecuteFunctions,
+    operation: string
+  ) {
+    this.context = context;
+    this.operation = operation;
+  }
 
   /**
    * Initialize the Telegram client with credentials
    */
   protected async initializeClient(): Promise<void> {
     const creds = await this.context.getCredentials('telegramApi') as any;
-    
+
     if (!creds) {
       throw new Error('No Telegram credentials found');
     }

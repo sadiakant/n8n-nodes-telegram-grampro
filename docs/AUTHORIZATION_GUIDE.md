@@ -351,3 +351,17 @@ For enterprise environments:
 5. Regular security assessments
 
 This guide provides a complete authentication solution for integrating Telegram into your n8n workflows with proper session management, enhanced security, and improved error handling. The new features provide better performance, security, and user experience while maintaining enterprise-grade reliability.
+
+## Credential Verification Behavior (Updated)
+
+- Credential Save/Test now performs real MTProto getMe verification using your API ID, API Hash, and Session String.
+- If credentials are invalid, Save/Test fails with a mapped Telegram-specific error message.
+- n8n global credentials UI may still display the generic success text Connection tested successfully even after real verification.
+
+### Common Mapped Credential Errors
+- AUTH_KEY_UNREGISTERED: Session invalid/expired. Re-run Auth > Complete Login.
+- SESSION_REVOKED / SESSION_EXPIRED: Session revoked or expired. Re-authenticate.
+- SESSION_PASSWORD_NEEDED: Account has 2FA enabled; provide password.
+- FLOOD_WAIT_X: Wait for Telegram rate-limit window before retrying.
+- NETWORK_TIMEOUT / ETIMEDOUT: Temporary network issue; retry.
+

@@ -2,8 +2,8 @@ import { logger } from './logger';
 
 interface QueuedRequest<T = any> {
   fn: () => Promise<T>;
-  resolve: (value: T) => void;
-  reject: (error: unknown) => void;
+  resolve: (_value: T) => void; // eslint-disable-line no-unused-vars
+  reject: (_error: unknown) => void; // eslint-disable-line no-unused-vars
 }
 
 /**
@@ -39,7 +39,8 @@ export class RateLimiter {
         }
         RateLimiter._lock = false;
       } else {
-        while (RateLimiter._lock) {}
+        // Busy-wait until lock is released
+        while (RateLimiter._lock) { /* intentional empty block */ }
         if (!RateLimiter._instance) {
           throw new Error('Failed to initialize RateLimiter instance');
         }
@@ -59,10 +60,10 @@ export class RateLimiter {
     if (this.requestQueue.length >= this.maxQueueSize) {
       throw new Error('Rate limiter queue is full. Please try again later.');
     }
-    
+
     return new Promise<T>((resolve, reject) => {
       const request = { fn, resolve, reject };
-      
+
       if (priority) {
         // Insert at the beginning for high priority requests
         this.requestQueue.unshift(request);

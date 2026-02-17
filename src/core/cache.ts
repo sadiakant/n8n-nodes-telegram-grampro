@@ -15,7 +15,7 @@ export class CacheManager {
   private static _instance: CacheManager | null = null;
   private static _lock: boolean = false;
 
-  private constructor() {}
+  private constructor() { }
 
   /**
    * Get the singleton instance (thread-safe)
@@ -29,7 +29,8 @@ export class CacheManager {
         }
         CacheManager._lock = false;
       } else {
-        while (CacheManager._lock) {}
+        // Busy-wait until lock is released
+        while (CacheManager._lock) { /* intentional empty block */ }
         if (!CacheManager._instance) {
           throw new Error('Failed to initialize CacheManager instance');
         }
@@ -59,7 +60,7 @@ export class CacheManager {
    */
   get<T>(key: string): T | null {
     const entry = this.cache.get(key);
-    
+
     if (!entry) {
       return null;
     }
@@ -78,7 +79,7 @@ export class CacheManager {
    */
   has(key: string): boolean {
     const entry = this.cache.get(key);
-    
+
     if (!entry) {
       return false;
     }

@@ -3,7 +3,7 @@ import { getClient } from '../../core/clientManager';
 import { safeExecute } from '../../core/floodWaitHandler';
 import { withRateLimit } from '../../core/rateLimiter';
 import { Api } from 'telegram';
-import bigInt from 'big-integer';
+
 
 export async function channelRouter(this: IExecuteFunctions, operation: string, i: number): Promise<INodeExecutionData[]> {
 
@@ -85,7 +85,7 @@ async function getChannelParticipants(this: IExecuteFunctions, client: any, i: n
 					filter: apiFilter,
 					offset,
 					limit: batchSize,
-					hash: bigInt.zero,
+					hash: BigInt(0) as any,
 				}))
 			)
 		);
@@ -418,7 +418,7 @@ async function promoteUser(this: IExecuteFunctions, client: any, i: number): Pro
 	const channelId = this.getNodeParameter('channelId', i);
 	const userIdToPromote = this.getNodeParameter('userIdToPromote', i);
 	const adminTitle = String(this.getNodeParameter('adminTitle', i, 'Admin'));
-	
+
 	// Admin permissions
 	const canChangeInfo = Boolean(this.getNodeParameter('canChangeInfo', i, false));
 	const canPostMessages = Boolean(this.getNodeParameter('canPostMessages', i, false));
@@ -440,7 +440,7 @@ async function promoteUser(this: IExecuteFunctions, client: any, i: number): Pro
 
 	try {
 		// REMOVED: The manual GetParticipant/hasPromotePermission check.
-        // We rely on the API to tell us if we are forbidden.
+		// We rely on the API to tell us if we are forbidden.
 
 		// Promote user to admin
 		await withRateLimit(async () =>
@@ -497,7 +497,7 @@ async function promoteUser(this: IExecuteFunctions, client: any, i: number): Pro
 	} catch (error) {
 		// Enhanced error handling for permission issues
 		const errorMessage = error instanceof Error ? error.message : String(error);
-		
+
 		if (errorMessage.includes('RIGHT_FORBIDDEN') || errorMessage.includes('CHAT_ADMIN_REQUIRED')) {
 			return [{
 				json: {
@@ -508,7 +508,7 @@ async function promoteUser(this: IExecuteFunctions, client: any, i: number): Pro
 				pairedItem: { item: i },
 			}];
 		}
-		
+
 		return [{
 			json: {
 				success: false,

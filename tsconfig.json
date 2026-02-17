@@ -13,8 +13,20 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "types": [
+      "node"
+    ],
+    "typeRoots": [
+      "./node_modules/@types"
+    ]
   },
+  "exclude": [
+    "node_modules",
+    "dist"
+  ],
   "include": [
     "src/**/*",
     "scripts/**/*"

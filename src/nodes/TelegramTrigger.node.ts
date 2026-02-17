@@ -1,5 +1,12 @@
-import { ITriggerFunctions, INodeType, INodeTypeDescription, ITriggerResponse, NodeOperationError } from 'n8n-workflow';
+import {
+    ITriggerFunctions,
+    INodeType,
+    INodeTypeDescription,
+    ITriggerResponse,
+    NodeOperationError,
+} from 'n8n-workflow';
 import { getClient } from '../core/clientManager';
+import { testTelegramApi } from '../credentials/TelegramApi.credentials';
 import { NewMessage } from 'telegram/events';
 import { logger } from '../core/logger';
 
@@ -20,6 +27,7 @@ export class TelegramTrigger implements INodeType {
             {
                 name: 'telegramApi',
                 required: true,
+                testedBy: 'testTelegramApi',
             }
         ],
         properties: [
@@ -55,9 +63,16 @@ export class TelegramTrigger implements INodeType {
                 default: false,
                 description: 'Trigger on outgoing messages (sent by you)',
             },
-        ]
+        ],
     };
 
+    methods = {
+        credentialTest: {
+            testTelegramApi,
+        },
+    };
+
+    // eslint-disable-next-line no-unused-vars
     async trigger(this: ITriggerFunctions): Promise<ITriggerResponse> {
         const creds = await this.getCredentials('telegramApi') as any;
 

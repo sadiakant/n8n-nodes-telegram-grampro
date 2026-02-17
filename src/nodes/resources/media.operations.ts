@@ -41,7 +41,9 @@ async function downloadMedia(this: IExecuteFunctions, client: any, i: number): P
 
 	const buffer = await safeExecute(() =>
 		client.downloadMedia(message.media),
-	) as Buffer;
+	) as Buffer | Uint8Array;
+
+	const normalizedBuffer = ensureBuffer(buffer);
 
 	// Determine mime type and file name
 	let mimeType = 'application/octet-stream';
@@ -61,15 +63,27 @@ async function downloadMedia(this: IExecuteFunctions, client: any, i: number): P
 			success: true,
 			fileName,
 			mimeType,
-			size: buffer.length
+			size: normalizedBuffer.length
 		},
 		binary: {
 			data: {
-				data: buffer.toString('base64'),
+				data: normalizedBuffer.toString('base64'),
 				mimeType,
 				fileName,
 			}
 		},
 		pairedItem: { item: i },
 	}];
+}
+
+function ensureBuffer(data: Buffer | Uint8Array): Buffer {
+	if (Buffer.isBuffer(data)) {
+		return data;
+	}
+
+	if (data instanceof Uint8Array) {
+		return Buffer.from(data);
+	}
+
+	throw new Error('Downloaded media is not in a supported binary format');
 }

@@ -45,7 +45,7 @@ export class EnhancedValidator {
       pattern?: RegExp;
       min?: number;
       max?: number;
-      custom?: (value: any) => string | null;
+      custom?: (_value: any) => string | null; // eslint-disable-line no-unused-vars
     } = {}
   ): this {
     // Required validation
@@ -170,22 +170,22 @@ export class EnhancedValidator {
 export const ValidationPatterns = {
   // Phone number: +1234567890 or 1234567890
   PHONE: /^[+]?[1-9]\d{1,14}$/,
-  
+
   // Telegram API ID: 6-9 digits
   API_ID: /^\d{6,9}$/,
-  
+
   // Telegram API Hash: 32 hexadecimal characters
   API_HASH: /^[a-f0-9]{32}$/i,
-  
+
   // Telegram username: @username or username
   USERNAME: /^@?[a-zA-Z0-9_]{5,32}$/,
-  
+
   // Chat ID: Can be username, invite link, or numeric ID
   CHAT_ID: /^(@[a-zA-Z0-9_]{5,32}|t\.me\/[a-zA-Z0-9_]+|-?\d+)$/,
-  
+
   // Message ID: Non-negative integer
   MESSAGE_ID: /^\d+$/,
-  
+
   // URL pattern
   URL: /^https?:\/\/.+/,
 };
@@ -230,7 +230,7 @@ export const CommonValidators = {
         type: 'string',
         pattern: ValidationPatterns.PHONE,
         custom: (value) => {
-          const cleanNumber = value.replace(/[\s\-\(\)]/g, '');
+          const cleanNumber = value.replace(/[\s\-()]/g, '');
           if (cleanNumber.length < 8) {
             return 'Phone number seems unusually short';
           }
@@ -360,7 +360,7 @@ export function validatePhoneNumber(phoneNumber: any): ValidationResult {
     result.isValid = false;
   } else {
     // Remove spaces and common formatting
-    const cleanNumber = phoneNumber.replace(/[\s\-\(\)]/g, '');
+    const cleanNumber = phoneNumber.replace(/[\s\-()]/g, '');
 
     if (!/^[+]?[1-9]\d{1,14}$/.test(cleanNumber)) {
       result.errors.push('Phone number must be in international format (e.g., +1234567890)');

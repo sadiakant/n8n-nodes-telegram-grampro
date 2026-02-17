@@ -6,6 +6,7 @@
 
 [![Build Status](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/build.yml/badge.svg)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/build.yml)
 [![Publish Status](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/publish.yml/badge.svg)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/publish.yml)
+[![Socket Badge](https://badge.socket.dev/npm/package/n8n-nodes-telegram-grampro)](https://badge.socket.dev/npm/package/n8n-nodes-telegram-grampro)
 
 [![Telegram](https://img.shields.io/badge/Telegram-API-blue.svg)](https://core.telegram.org/api)
 [![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-blue.svg)](https://www.typescriptlang.org/)
@@ -88,7 +89,7 @@ Telegram GramPro is a comprehensive n8n custom node that brings the full power o
 - Note your **API ID** and **API Hash**
 
 ### 2. Create Session String
-Use our built-in authentication operations. For detailed step-by-step instructions, see our [Authorization Guide](AUTHORIZATION_GUIDE.md).
+Use our built-in authentication operations. For detailed step-by-step instructions, see our [Authorization Guide](./docs/AUTHORIZATION_GUIDE.md).
 
 ### 3. Configure Credentials
 In n8n → Settings → Credentials:
@@ -96,11 +97,12 @@ In n8n → Settings → Credentials:
 - **API Hash**: Your Telegram API hash  
 - **Session String**: Your encrypted session string
 - **Mobile Number**: Your Telegram mobile number with country code (e.g., +1234567890)
-- **2FA Code (Optional)**: Your Telegram 2FA code if enabled
+- **Validation**: Save/Test performs real MTProto getMe verification.
+- **UI Note**: n8n may still show the generic label Connection tested successfully on the global credentials page.
 
 ## 🎯 Comprehensive Operations Guide
 
-For detailed documentation of all operations with parameters, examples, and use cases, see our [Operations Guide](OPERATIONS_GUIDE.md).
+For detailed documentation of all operations with parameters, examples, and use cases, see our [Operations Guide](./docs/OPERATIONS_GUIDE.md).
 
 ## 🔧 Available Operations
 
@@ -142,7 +144,13 @@ The node handles common Telegram errors gracefully:
 - **NETWORK_TIMEOUT**: Exponential backoff retries (up to 5 attempts)
 - **CHAT_WRITE_FORBIDDEN**: Permission error handling
 - **USER_BANNED_IN_CHANNEL**: Channel ban detection
-- **INPUT_USER_DEACTIVATED**: Deactivated user handling
+- **AUTH_KEY_UNREGISTERED**: Session is invalid or expired and must be regenerated
+- **SESSION_EXPIRED**: Session expired and must be renewed
+- **USER_PRIVACY_RESTRICTED**: Action blocked by user privacy settings
+- **CHANNEL_PRIVATE**: Channel or group is private/inaccessible
+- **USERNAME_NOT_OCCUPIED / USERNAME_INVALID**: Username does not exist or has invalid format
+- **INVITE_HASH_INVALID / INVITE_HASH_EXPIRED**: Invite link is invalid or expired
+- **PEER_ID_INVALID / MESSAGE_ID_INVALID**: Chat/message identifiers are invalid
 
 ## ⚡ Performance Optimizations
 
@@ -184,41 +192,36 @@ In-memory caching for frequently accessed data:
 
 ## 🚨 Troubleshooting
 
-For comprehensive troubleshooting guidance, common issues, and solutions, see our [Troubleshooting Guide](TROUBLESHOOTING_GUIDE.md).
+For comprehensive troubleshooting guidance, common issues, and solutions, see our [Troubleshooting Guide](./docs/TROUBLESHOOTING_GUIDE.md).
 
 ## Project Structure
 
 ```
 n8n-nodes-telegram-grampro/
-├── src/
-│   ├── core/                    # Core functionality and utilities
-│   │   ├── clientManager.ts     # Client connection management
-│   │   ├── floodWaitHandler.ts  # Error handling and retry logic
-│   │   ├── logger.ts            # Structured logging system
-│   │   ├── operationHelpers.ts  # Base operation class and helpers
-│   │   ├── rateLimiter.ts       # Rate limiting and request queuing
-│   │   ├── sessionEncryption.ts # AES-256-GCM session encryption
-│   │   └── validation.ts        # Input validation
-│   ├── credentials/             # Credential type definition
-│   │   └── TelegramApi.credentials.ts
-│   ├── nodes/                   # Node implementations
-│   │   ├── TelegramMtproto.node.ts    # Main operation node
-│   │   ├── TelegramTrigger.node.ts    # Trigger node
-│   │   ├── icons/               # Node icons
-│   │   └── resources/           # Resource operations
-│   │       ├── message.operations.ts
-│   │       ├── chat.operations.ts
-│   │       ├── user.operations.ts
-│   │       ├── media.operations.ts
-│   │       ├── channel.operations.ts
-│   │       └── authentication.operations.ts
-│   ├── types/                   # Type definitions
-│   │   └── telegram.ts
-│   └── index.ts                 # Main entry point
-├── package.json                 # Project configuration
-├── tsconfig.json                # TypeScript configuration
-├── esbuild.config.mjs           # Build configuration
-└── README.md                    # Documentation
+├── .github/                 # GitHub specific configuration & metadata
+│   ├── workflows/           # CI/CD pipelines (Build & Publish)
+│   ├── CODE_OF_CONDUCT.md   # Community guidelines
+│   ├── CONTRIBUTING.md      # Instructions for developers
+│   ├── LICENSE              # Legal usage rights
+│   └── SECURITY.md          # Security policy and reporting
+├── docs/                    # Extended documentation & manuals
+│   ├── AUTHORIZATION_GUIDE.md # Steps for Telegram API auth
+│   ├── OPERATIONS_GUIDE.md    # Detailed node usage instructions
+│   └── TROUBLESHOOTING_GUIDE.md # Common errors and fixes
+├── src/                     # Source code
+│   ├── core/                # Core logic (Rate limiting, Encryption, Auth)
+│   ├── credentials/         # n8n Credential definitions
+│   ├── nodes/               # n8n Node implementations (Main & Trigger)
+│   │   ├── icons/           # Brand assets
+│   │   └── resources/       # API resource operations (Chat, Media, etc.)
+│   ├── types/               # TypeScript interfaces & types
+│   └── index.ts             # Library entry point
+├── .gitignore               # Files excluded from version control
+├── copy-assets.mjs          # Build script for static assets
+├── esbuild.config.mjs       # Fast bundling configuration
+├── package.json             # Dependencies and npm scripts
+├── README.md                # Project overview and quick start
+└── tsconfig.json            # TypeScript compiler settings
 ```
 
 ## 🎨 Workflow Examples

@@ -37,13 +37,13 @@ export class SessionEncryption {
     try {
       const { key, salt } = this.generateKey(password);
       const iv = crypto.randomBytes(this.IV_LENGTH);
-      
+
       const cipher = crypto.createCipheriv(this.ALGORITHM, key, iv);
       let encrypted = cipher.update(session, 'utf8', 'hex');
       encrypted += cipher.final('hex');
-      
+
       const tag = cipher.getAuthTag();
-      
+
       // Combine salt + iv + tag + encrypted data
       const combined = Buffer.concat([
         salt,
@@ -51,7 +51,7 @@ export class SessionEncryption {
         tag,
         Buffer.from(encrypted, 'hex')
       ]);
-      
+
       return combined.toString('base64');
     } catch (error) {
       throw new Error(`Session encryption failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -67,18 +67,18 @@ export class SessionEncryption {
   static decryptSession(encryptedSession: string, password: string): string {
     try {
       const combined = Buffer.from(encryptedSession, 'base64');
-      
+
       // Extract salt, iv, tag, and encrypted data
       const salt = combined.subarray(0, 16);
       const iv = combined.subarray(16, 16 + this.IV_LENGTH);
       const tag = combined.subarray(16 + this.IV_LENGTH, 16 + this.IV_LENGTH + this.TAG_LENGTH);
       const encryptedData = combined.subarray(16 + this.IV_LENGTH + this.TAG_LENGTH);
-      
+
       const { key } = this.generateKey(password, salt);
-      
+
       const decipher = crypto.createDecipheriv(this.ALGORITHM, key, iv);
       decipher.setAuthTag(tag);
-      
+
       const decryptedBuffer = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
       return decryptedBuffer.toString('utf8');
     } catch (error) {
@@ -103,12 +103,12 @@ export class SessionEncryption {
     try {
       // Try to decode as base64
       const decoded = Buffer.from(session, 'base64');
-      
+
       // Encrypted sessions should have a specific structure:
       // salt (16 bytes) + iv (16 bytes) + tag (16 bytes) + data (at least 10 bytes)
       const minEncryptedLength = 16 + 16 + 16 + 10; // 58 bytes minimum
-      const maxPlainLength = 100; // Plain sessions should be under 100 bytes
-      
+      // const maxPlainLength = 100; // Plain sessions should be under 100 bytes
+
       // Encrypted sessions must be at least 58 bytes
       // and typically longer than plain text sessions
       return decoded.length >= minEncryptedLength && decoded.length % 2 === 0;

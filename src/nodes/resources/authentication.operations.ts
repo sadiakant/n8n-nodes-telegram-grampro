@@ -13,15 +13,15 @@ async function forceCleanup(client: TelegramClient, phone: string) {
     try {
         // Silence logger during destruction to prevent noise
         client.setLogLevel(LogLevel.NONE);
-        
+
         // Disconnect creates a promise that resolves when socket closes
         await client.disconnect();
-        
+
         // Destroy is crucial: it kills internal keep-alive timers that keep the node process "active"
         await client.destroy();
-        
+
         logger.info(`Cleanly disconnected auth client: ${phone}`);
-    } catch (e) {
+    } catch {
         // We ignore errors here because we are destroying anyway
     }
 }
@@ -36,14 +36,14 @@ async function requestCode(this: IExecuteFunctions, i: number): Promise<INodeExe
     // Parse Int explicitly
     const rawApiId = this.getNodeParameter('apiId', i);
     const apiId = parseInt(rawApiId as string, 10);
-    
+
     const apiHash = this.getNodeParameter('apiHash', i) as string;
     const phoneNumber = this.getNodeParameter('phoneNumber', i) as string;
 
-    const client = new TelegramClient(new StringSession(''), apiId, apiHash, { 
+    const client = new TelegramClient(new StringSession(''), apiId, apiHash, {
         connectionRetries: 1,
         useWSS: false,
-        autoReconnect: false 
+        autoReconnect: false
     });
 
     let phoneCodeHash: string | undefined;
@@ -54,7 +54,7 @@ async function requestCode(this: IExecuteFunctions, i: number): Promise<INodeExe
 
         const result = await safeExecute(() =>
             client.sendCode({ apiId, apiHash }, phoneNumber)
-        );
+        ) as { phoneCodeHash: string; isCodeViaApp?: boolean };
 
         phoneCodeHash = result.phoneCodeHash;
         isCodeViaApp = result.isCodeViaApp;
@@ -70,7 +70,7 @@ async function requestCode(this: IExecuteFunctions, i: number): Promise<INodeExe
         // Ensure cleanup happens BEFORE returning data to n8n
         await forceCleanup(client, phoneNumber);
     }
-    
+
     if (!phoneCodeHash) {
         throw new Error('Failed to obtain phoneCodeHash from Telegram. Cannot continue authentication.');
     }
@@ -81,8 +81,8 @@ async function requestCode(this: IExecuteFunctions, i: number): Promise<INodeExe
             phoneCodeHash,
             isCodeViaApp,
             preAuthSession: client.session.save(),
-            apiId, 
-            apiHash, 
+            apiId,
+            apiHash,
             phoneNumber,
             note: "IMPORTANT: Check your phone for the verification code."
         } as IDataObject,
@@ -101,7 +101,7 @@ async function signIn(this: IExecuteFunctions, i: number): Promise<INodeExecutio
     const preAuthSession = this.getNodeParameter('preAuthSession', i) as string;
     const password2fa = this.getNodeParameter('password2fa', i, '') as string;
 
-    const client = new TelegramClient(new StringSession(preAuthSession), apiId, apiHash, { 
+    const client = new TelegramClient(new StringSession(preAuthSession), apiId, apiHash, {
         connectionRetries: 1,
         useWSS: false,
         autoReconnect: false
@@ -113,7 +113,7 @@ async function signIn(this: IExecuteFunctions, i: number): Promise<INodeExecutio
             await safeExecute(() => client.invoke(new Api.auth.SignIn({ phoneNumber, phoneCodeHash, phoneCode })));
         } catch (err: any) {
             if (!err.message.includes('SESSION_PASSWORD_NEEDED')) throw err;
-            
+
             // Fallback to 2FA password-based login using built-in helper
             if (!password2fa) {
                 throw new Error('Two-step verification is enabled on this account. Please provide the 2FA password.');

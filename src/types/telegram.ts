@@ -107,6 +107,7 @@ export interface TelegramError {
   message: string;
   retryable: boolean;
   retryAfter?: number;
+  retryAfterSeconds?: number;
 }
 
 /**

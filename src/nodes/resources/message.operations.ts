@@ -2,9 +2,9 @@ import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
 import { getClient } from '../../core/clientManager';
 import { safeExecute } from '../../core/floodWaitHandler';
 import { withRateLimit } from '../../core/rateLimiter';
-import { Api, TelegramClient } from 'telegram';
+import { Api } from 'telegram';
 import { CustomFile } from 'telegram/client/uploads';
-import bigInt from 'big-integer';
+
 import { logger } from '../../core/logger';
 
 export async function messageRouter(this: IExecuteFunctions, operation: string, i: number): Promise<INodeExecutionData[]> {
@@ -84,7 +84,7 @@ async function editMessage(this: IExecuteFunctions, client: any, i: number): Pro
                 else formattedSourceId = rawId;
             }
         }
-    } catch (error) { }
+    } catch { /* intentionally ignoring */ }
 
     const mediaInfo = extractMediaInfo(detailedMessage?.media);
     const messageDate = detailedMessage?.date;
@@ -120,7 +120,7 @@ async function editMessageMedia(this: IExecuteFunctions, client: any, i: number)
     const chatId = editMediaFromSelf ? 'me' : (this.getNodeParameter('chatId', i) as string);
     const messageId = Number(this.getNodeParameter('messageId', i));
     const media = this.getNodeParameter('media', i);
-	const captionInput = this.getNodeParameter('caption', i, '') as string;
+    const captionInput = this.getNodeParameter('caption', i, '') as string;
     const captionEntitiesInput = this.getNodeParameter('captionEntities', i, []) as any[];
     const parseMode = this.getNodeParameter('parseMode', i, 'default') as string;
 
@@ -145,7 +145,7 @@ async function editMessageMedia(this: IExecuteFunctions, client: any, i: number)
         }
     }
 
-	const result = await safeExecute(() =>
+    const result = await safeExecute(() =>
         client.editMessage(chatId, {
             message: messageId,
             file: media,
@@ -162,9 +162,9 @@ async function editMessageMedia(this: IExecuteFunctions, client: any, i: number)
         if (messages && messages.length > 0) {
             detailedMessage = messages[0];
         }
-        } catch (error) {
-            logger.warn('Failed to fetch detailed message info after edit: ' + (error as Error).message);
-        }
+    } catch (error) {
+        logger.warn('Failed to fetch detailed message info after edit: ' + (error as Error).message);
+    }
 
     return [{
         json: {
@@ -232,7 +232,7 @@ async function deleteMessage(this: IExecuteFunctions, client: any, i: number): P
                 else formattedSourceId = rawId;
             }
         }
-    } catch (error) { }
+    } catch { /* intentionally ignoring */ }
 
     const mediaInfo = extractMediaInfo(detailedMessage?.media);
     const messageDate = detailedMessage?.date;
@@ -290,7 +290,7 @@ async function deleteHistory(this: IExecuteFunctions, client: any, i: number): P
             // 'limit: 0' fetches metadata (including total count) without fetching message bodies
             const countResult = await client.getMessages(peer, { limit: 0 });
             preDeleteCount = (countResult as any).total || 0;
-        } catch (e) {
+        } catch {
             // If fetching count fails, we gracefully degrade to 0
         }
 
@@ -382,7 +382,7 @@ async function pinMessage(this: IExecuteFunctions, client: any, i: number): Prom
                 else formattedSourceId = rawId;
             }
         }
-    } catch (error) { }
+    } catch { /* intentionally ignoring */ }
 
     const mediaInfo = extractMediaInfo(detailedMessage?.media);
     const messageDate = detailedMessage?.date;
@@ -479,14 +479,6 @@ async function sendText(this: IExecuteFunctions, client: any, i: number): Promis
     return await formatSendResult.call(this, client, msg, chatIdStr, textStr, hasMedia || mediaInfo.hasMedia, resolvedMediaType, replyTo, i);
 }
 
-function buildExternalMedia(url: string, mediaType: string): any {
-    if (mediaType === 'photo') {
-        return new Api.InputMediaPhotoExternal({ url });
-    }
-    // Use document external for videos/documents/other
-    return new Api.InputMediaDocumentExternal({ url });
-}
-
 async function formatSendResult(this: IExecuteFunctions, client: any, msg: any, chatId: string, text: string, hasMedia: boolean, mediaType: string, replyTo: number, i: number): Promise<INodeExecutionData[]> {
 
     let senderId: string | null = null;
@@ -503,7 +495,7 @@ async function formatSendResult(this: IExecuteFunctions, client: any, msg: any, 
         try {
             const me = await client.getMe();
             senderId = (me as any)?.id?.toString() || null;
-        } catch (error) {
+        } catch {
             senderId = null;
         }
     }
@@ -528,7 +520,7 @@ async function formatSendResult(this: IExecuteFunctions, client: any, msg: any, 
                 else formattedSourceId = rawId;
             }
         }
-    } catch (error) { }
+    } catch { /* intentionally ignoring */ }
 
     const mediaInfo = extractMediaInfo((msg as any)?.media);
     const finalHasMedia = hasMedia || mediaInfo.hasMedia;
@@ -584,13 +576,13 @@ async function downloadUrlToBuffer(url: string): Promise<{ buffer: Buffer; mimeT
     const disposition = res.headers.get('content-disposition');
     let fileName: string | undefined;
     if (disposition && disposition.includes('filename=')) {
-        const match = disposition.match(/filename="?([^\";]+)"?/i);
+        const match = disposition.match(/filename="?([^";]+)"?/i);
         if (match && match[1]) fileName = match[1];
     } else {
         try {
             const u = new URL(url);
             fileName = u.pathname.split('/').filter(Boolean).pop();
-        } catch (_) { }
+        } catch { /* intentionally ignoring */ }
     }
     return { buffer, mimeType, fileName };
 }
@@ -617,10 +609,6 @@ function extractMediaInfo(media: any): { hasMedia: boolean; mediaType: string } 
     }
 
     return { hasMedia: true, mediaType: 'other' };
-}
-
-function pad(num: number): string {
-    return num < 10 ? `0${num}` : `${num}`;
 }
 
 function formatDateWithTime(date: Date): string {
@@ -694,7 +682,7 @@ async function forwardMessage(this: IExecuteFunctions, client: any, i: number): 
                 else formattedTargetId = rawId;
             }
         }
-    } catch (error) { }
+    } catch { /* intentionally ignoring */ }
 
     const mediaInfo = extractMediaInfo((msg as any)?.media);
     const messageDate = (msg as any)?.date;
@@ -752,7 +740,7 @@ async function getHistory(this: IExecuteFunctions, client: any, i: number): Prom
                 else formattedSourceId = rawId;
             }
         }
-    } catch (error) { }
+    } catch { /* intentionally ignoring */ }
 
     let messages: any[] = [];
 
@@ -872,7 +860,7 @@ async function unpinMessage(this: IExecuteFunctions, client: any, i: number): Pr
                 else formattedSourceId = rawId;
             }
         }
-    } catch (error) { }
+    } catch { /* intentionally ignoring */ }
 
     const mediaInfo = extractMediaInfo(detailedMessage?.media);
     const messageDate = detailedMessage?.date;
@@ -915,7 +903,6 @@ async function sendPoll(this: IExecuteFunctions, client: any, i: number): Promis
     const options = this.getNodeParameter('pollOptions', i) as string[];
     const isQuiz = this.getNodeParameter('isQuiz', i) as boolean;
     const isAnonymous = this.getNodeParameter('anonymous', i, true) as boolean;
-    const createdAt = new Date();
 
     let correctAnswers: Buffer[] | undefined = undefined;
     if (isQuiz) {
@@ -926,14 +913,14 @@ async function sendPoll(this: IExecuteFunctions, client: any, i: number): Promis
     const peer = await client.getEntity(chatId);
     const isBroadcastChannel = peer.className === 'Channel' && peer.broadcast;
     const publicVoters = isBroadcastChannel ? false : !isAnonymous;
-    const pollId = bigInt(Math.floor(Math.random() * 1000000000));
+    const pollId = BigInt(Math.floor(Math.random() * 1000000000));
 
     await safeExecute(() =>
         client.invoke(new Api.messages.SendMedia({
             peer: peer,
             media: new Api.InputMediaPoll({
                 poll: new Api.Poll({
-                    id: pollId,
+                    id: pollId as any,
                     question: new Api.TextWithEntities({
                         text: question,
                         entities: [],
@@ -950,7 +937,7 @@ async function sendPoll(this: IExecuteFunctions, client: any, i: number): Promis
                 correctAnswers: correctAnswers,
             }),
             message: '',
-            randomId: bigInt(Math.floor(Math.random() * 1000000000)),
+            randomId: BigInt(Math.floor(Math.random() * 1000000000)) as any,
         }))
     );
 
@@ -1263,7 +1250,7 @@ async function handlePhoto(client: any, message: any, targetChatId: string, opti
             peer: targetChatId,
             media: inputMediaPhoto,
             message: caption,
-            randomId: bigInt(Math.floor(Math.random() * 1000000000)),
+            randomId: BigInt(Math.floor(Math.random() * 1000000000)) as any,
         }));
     } catch (forwardError: any) {
         // If forwarding is restricted, fall back to download-and-upload
@@ -1386,7 +1373,7 @@ async function handleLocation(client: any, message: any, targetChatId: string, o
             })
         }),
         message: caption,
-        randomId: bigInt(Math.floor(Math.random() * 1000000000)),
+        randomId: BigInt(Math.floor(Math.random() * 1000000000)) as any,
     }));
 }
 
@@ -1401,7 +1388,7 @@ async function handleContact(client: any, message: any, targetChatId: string) {
             vcard: message.media?.contact?.vcard || '',
         }),
         message: '',
-        randomId: bigInt(Math.floor(Math.random() * 1000000000)),
+        randomId: BigInt(Math.floor(Math.random() * 1000000000)) as any,
     }));
 }
 
@@ -1414,7 +1401,7 @@ async function handlePoll(client: any, message: any, targetChatId: string, optio
         peer: targetChatId,
         media: new Api.InputMediaPoll({
             poll: new Api.Poll({
-                id: bigInt(Math.floor(Math.random() * 1000000000)),
+                id: BigInt(Math.floor(Math.random() * 1000000000)) as any,
                 question: new Api.TextWithEntities({
                     text: message.poll?.question || '',
                     entities: [],
@@ -1430,7 +1417,7 @@ async function handlePoll(client: any, message: any, targetChatId: string, optio
             }),
         }),
         message: caption,
-        randomId: bigInt(Math.floor(Math.random() * 1000000000)),
+        randomId: BigInt(Math.floor(Math.random() * 1000000000)) as any,
     }));
 }
 
@@ -1442,7 +1429,7 @@ async function handleDice(client: any, message: any, targetChatId: string) {
             emoticon: message.dice?.emoji || '🎲'
         }),
         message: '',
-        randomId: bigInt(Math.floor(Math.random() * 1000000000)),
+        randomId: BigInt(Math.floor(Math.random() * 1000000000)) as any,
     }));
 }
 
