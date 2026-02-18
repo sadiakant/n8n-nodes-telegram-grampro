@@ -1,12 +1,13 @@
 {
   "name": "n8n-nodes-telegram-grampro",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Telegram GramPro production nodes for n8n",
   "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "node esbuild.config.mjs && node copy-assets.mjs",
+    "test": "npm run lint && npm run build",
     "lint": "n8n-node lint",
     "lint:fix": "n8n-node lint --fix",
     "dev": "node esbuild.config.mjs --watch",
