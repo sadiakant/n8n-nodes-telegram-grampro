@@ -1,5 +1,8 @@
-# Dependencies
-node_modules/
-
-# Build outputs
-dist/
+node_modules
+.DS_Store
+.tmp
+tmp
+dist
+npm-debug.log*
+yarn.lock
+.vscode/launch.json

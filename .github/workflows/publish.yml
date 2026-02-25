@@ -2,7 +2,7 @@ name: Publish to NPM
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -10,7 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # Provenance aur OIDC ke liye zaroori hai
+      id-token: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -18,37 +19,53 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           registry-url: https://registry.npmjs.org/
 
-      - name: Update npm
-        run: npm install -g npm@latest
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build project
-        run: npm run build
+        run: pnpm build
+
+      - name: Runtime versions
+        run: |
+          node --version
+          npm --version
 
       - name: Smart Publish Logic
+        env:
+          NODE_AUTH_TOKEN: ''
+          NPM_TOKEN: ''
         run: |
-          # 1. Variables setup
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           LOCAL_VERSION=$(node -p "require('./package.json').version")
-          
-          # NPM se current version check karna (0.0.0 agar package naya hai)
-          REMOTE_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
-          
-          echo "🔍 Checking Versions..."
-          echo "📍 Local: $LOCAL_VERSION"
-          echo "🌐 Remote: $REMOTE_VERSION"
 
-          # 2. Version Comparison Logic using Node.js (Very Accurate)
-          # Isme hum check karenge ki Local version Remote se bada hai, barabar hai ya chhota.
+          # Handle first-time publish scenarios
+          REMOTE_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+
+          echo "Checking Versions..."
+          echo "Local  : $LOCAL_VERSION"
+          echo "Remote : $REMOTE_VERSION"
+
           STATUS=$(node -e "
-            const local = '$LOCAL_VERSION'.split('.').map(Number);
+            const local  = '$LOCAL_VERSION'.split('.').map(Number);
             const remote = '$REMOTE_VERSION'.split('.').map(Number);
-            
             let result = 'EQUAL';
             for (let i = 0; i < 3; i++) {
               if (local[i] > (remote[i] || 0)) { result = 'GREATER'; break; }
@@ -57,23 +74,25 @@ jobs:
             console.log(result);
           ")
 
-          # 3. Decision Tree
+          echo "Status : $STATUS"
+
           if [ "$STATUS" == "GREATER" ]; then
-            echo "🚀 NEW VERSION DETECTED! Publishing to @latest..."
-            npm publish --provenance
+            echo "New version detected. Publishing $LOCAL_VERSION to @latest..."
+            npm config delete //registry.npmjs.org/:_authToken || true
+            npm publish --provenance --access public --ignore-scripts
+            echo "Published $LOCAL_VERSION to @latest"
 
           elif [ "$STATUS" == "EQUAL" ]; then
-            echo "🛠️ DAILY UPDATE DETECTED. Publishing to @dev..."
-            # Custom Timestamp: 13Feb2026.0807PM
+            echo "Same version. Publishing to @dev tag..."
             TIMESTAMP=$(date +%d%b%Y.%I%M%p)
             DEV_VERSION="${LOCAL_VERSION}-dev.${TIMESTAMP}"
-            
-            npm version $DEV_VERSION --no-git-tag-version
-            npm publish --tag dev --provenance
-            echo "✅ Published version $DEV_VERSION with tag @dev"
+
+            npm version $DEV_VERSION --no-git-tag-version --ignore-scripts
+            npm config delete //registry.npmjs.org/:_authToken || true
+            npm publish --tag dev --provenance --access public --ignore-scripts
+            echo "Published $DEV_VERSION to @dev"
 
           else
-            echo "❌ ERROR: Local version ($LOCAL_VERSION) is lower than NPM version ($REMOTE_VERSION)."
-            echo "Aapne galti se version piche kar diya hai. Please check package.json."
+            echo "ERROR: Local ($LOCAL_VERSION) < Remote ($REMOTE_VERSION). Update package.json version."
             exit 1
           fi

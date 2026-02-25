@@ -1,78 +1,88 @@
 {
-  "name": "n8n-nodes-telegram-grampro",
-  "version": "3.0.1",
-  "description": "Telegram GramPro production nodes for n8n",
-  "license": "MIT",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "node esbuild.config.mjs && node copy-assets.mjs",
-    "test": "npm run lint && npm run build",
-    "lint": "n8n-node lint",
-    "lint:fix": "n8n-node lint --fix",
-    "dev": "node esbuild.config.mjs --watch",
-    "n8n-scan": "npx @n8n/scan-community-package .",
-    "prepare": "npm run build"
-  },
-  "keywords": [
-    "n8n",
-    "n8n-nodes",
-    "telegram",
-    "telegram-api",
-    "telegram-mtproto",
-    "telegram-grampro",
-    "gramjs",
-    "automation",
-    "workflow",
-    "n8n-community-node-package"
-  ],
-  "author": {
-    "name": "sadiakant",
-    "email": "krushnakantsadiya@gmail.com"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/sadiakant/n8n-nodes-telegram-grampro.git"
-  },
-  "homepage": "https://github.com/sadiakant/n8n-nodes-telegram-grampro#readme",
-  "bugs": {
-    "url": "https://github.com/sadiakant/n8n-nodes-telegram-grampro/issues"
-  },
-  "dependencies": {
-    "n8n-workflow": "*"
-  },
-  "peerDependencies": {
-    "n8n-workflow": "*"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.10.0",
-    "@n8n/node-cli": "^0.20.0",
-    "@types/crypto-js": "^4.2.2",
-    "@types/node": "^20.19.33",
-    "esbuild": "^0.25.0",
-    "eslint": "^9.10.0",
-    "globals": "^15.0.0",
-    "telegram": "^2.26.22",
-    "typescript": "^5.7.3",
-    "typescript-eslint": "^8.0.0"
-  },
-  "n8n": {
-    "nodes": [
-      "dist/nodes/TelegramMtproto.node.js",
-      "dist/nodes/TelegramTrigger.node.js"
-    ],
-    "credentials": [
-      "dist/credentials/TelegramApi.credentials.js"
-    ]
-  },
-  "files": [
-    "dist"
-  ],
-  "engines": {
-    "node": ">=16.0.0"
-  },
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org/",
-    "access": "public"
-  }
+	"name": "n8n-nodes-telegram-grampro",
+	"version": "3.0.1",
+	"description": "Telegram GramPro is Telegram automation nodes for n8n that uses user account for automation.",
+	"license": "MIT",
+	"keywords": [
+		"n8n",
+		"n8n-nodes",
+		"telegram",
+		"telegram-api",
+		"telegram-mtproto",
+		"telegram-grampro",
+		"gramjs",
+		"automation",
+		"workflow",
+		"n8n-community-node-package"
+	],
+	"packageManager": "pnpm@10.30.1",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"scripts": {
+		"preinstall": "npx only-allow pnpm",
+		"build": "rimraf dist && tsc && gulp build:icons",
+		"test": "pnpm run lint && pnpm run build",
+		"format": "prettier src/core src/credentials src/nodes src/nodes/resources src/types src/index.ts --write",
+		"dev": "tsc --watch",
+		"lint": "eslint src/core src/credentials src/nodes src/nodes/resources src/types src/index.ts",
+		"lint:fix": "eslint src/core src/credentials src/nodes src/nodes/resources src/types src/index.ts --fix",
+		"n8n-scan": "pnpm dlx @n8n/scan-community-package .",
+		"prepublishOnly": "pnpm run lint && pnpm run build"
+	},
+	"author": {
+		"name": "sadiakant",
+		"email": "krushnakantsadiya@gmail.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/sadiakant/n8n-nodes-telegram-grampro.git"
+	},
+	"homepage": "https://github.com/sadiakant/n8n-nodes-telegram-grampro#readme",
+	"bugs": {
+		"url": "https://github.com/sadiakant/n8n-nodes-telegram-grampro/issues"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	},
+	"dependencies": {
+		"telegram": "^2.26.22"
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.10.0",
+		"@types/crypto-js": "^4.2.2",
+		"@types/node": "^25.2.0",
+		"@typescript-eslint/parser": "8.56.0",
+		"esbuild": "^0.25.0",
+		"eslint": "^9.10.0",
+		"eslint-plugin-n8n-nodes-base": "^1.16.1",
+		"globals": "^15.0.0",
+		"gulp": "^4.0.2",
+		"n8n-workflow": "*",
+		"only-allow": "^1.2.1",
+		"prettier": "^3.3.2",
+		"rimraf": "^5.0.5",
+		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.0.0"
+	},
+	"n8n": {
+		"nodes": [
+			"dist/nodes/TelegramMtproto.node.js",
+			"dist/nodes/TelegramTrigger.node.js"
+		],
+		"credentials": [
+			"dist/credentials/TelegramApi.credentials.js"
+		]
+	},
+	"files": [
+		"dist"
+	],
+	"engines": {
+		"node": ">=18.17.0",
+		"pnpm": ">=9.1"
+	},
+	"publishConfig": {
+		"registry": "https://registry.npmjs.org/",
+		"access": "public",
+		"provenance": true
+	}
 }

@@ -1,0 +1,6 @@
+onlyBuiltDependencies:
+  - bufferutil
+  - es5-ext
+  - esbuild
+  - eslint-plugin-n8n-nodes-base
+  - utf-8-validate

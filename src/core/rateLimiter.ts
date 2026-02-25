@@ -10,7 +10,6 @@ interface QueuedRequest<T = any> {
  * Rate limiter for Telegram API calls
  */
 export class RateLimiter {
-  private static instance: RateLimiter;
   private static _instance: RateLimiter | null = null;
   private static _lock: boolean = false;
   private requestQueue: QueuedRequest[];

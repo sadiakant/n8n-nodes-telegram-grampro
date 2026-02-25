@@ -40,13 +40,13 @@ When reporting an issue, include:
 git clone https://github.com/your-username/n8n-nodes-telegram-grampro.git
 
 # Install dependencies
-npm install
+pnpm install
 
 # Start development mode
-npm run dev
+pnpm run dev
 
 # Build for production
-npm run build
+pnpm run build
 ```
 
 ### **Testing**

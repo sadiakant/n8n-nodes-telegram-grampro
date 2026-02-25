@@ -40,6 +40,17 @@ export async function safeExecute<T>(fn: () => Promise<T>): Promise<T> {
         throw new Error(mappedError.userMessage);
       }
 
+      // SESSION_PASSWORD_NEEDED is expected during 2FA auth flow and can be handled upstream
+      if (mappedError.code === 'SESSION_PASSWORD_NEEDED') {
+        throw error;
+      }
+
+      // Handle login code errors immediately (non-retriable)
+      if (mappedError.code === 'PHONE_CODE_INVALID' || mappedError.code === 'PHONE_CODE_EXPIRED') {
+        logger.error(mappedError.userMessage);
+        throw new Error(mappedError.userMessage);
+      }
+
       // Handle USER_DEACTIVATED_BAN errors
       if (mappedError.code === 'USER_DEACTIVATED_BAN') {
         logger.error(mappedError.userMessage);
