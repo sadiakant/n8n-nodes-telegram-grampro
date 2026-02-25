@@ -1,4 +1,4 @@
-![Telegram GramPro Banner](https://repository-images.githubusercontent.com/1144534294/b1b16f9e-45da-43df-9ea7-0ff053a199ca)
+![Telegram GramPro Banner](https://raw.githubusercontent.com/sadiakant/n8n-nodes-telegram-grampro/refs/heads/main/docs/n8n-nodes-telegram-grampro.png)
 
 # Telegram GramPro - n8n Integration
 
