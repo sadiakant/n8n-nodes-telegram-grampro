@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-telegram-grampro",
-	"version": "4.0.0",
+	"version": "4.0.1",
 	"description": "Telegram GramPro is Telegram automation nodes for n8n that uses user account for automation.",
 	"license": "MIT",
 	"keywords": [
@@ -19,7 +19,6 @@
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"scripts": {
-		"preinstall": "npx only-allow pnpm",
 		"build": "rimraf dist && tsc && gulp build:icons",
 		"test": "pnpm run lint && pnpm run build",
 		"format": "prettier src/core src/credentials src/nodes src/nodes/resources src/types src/index.ts --write",
@@ -41,10 +40,8 @@
 	"bugs": {
 		"url": "https://github.com/sadiakant/n8n-nodes-telegram-grampro/issues"
 	},
-	"peerDependencies": {
-		"n8n-workflow": "*"
-	},
 	"dependencies": {
+		"n8n-workflow": "^1.120.0 || ^2.0.0",
 		"telegram": "^2.26.22"
 	},
 	"devDependencies": {
@@ -58,7 +55,6 @@
 		"globals": "^15.0.0",
 		"gulp": "^4.0.2",
 		"n8n-workflow": "*",
-		"only-allow": "^1.2.1",
 		"prettier": "^3.3.2",
 		"rimraf": "^5.0.5",
 		"typescript": "^5.9.3",
@@ -77,8 +73,7 @@
 		"dist"
 	],
 	"engines": {
-		"node": ">=18.17.0",
-		"pnpm": ">=9.1"
+		"node": ">=18.17.0"
 	},
 	"publishConfig": {
 		"registry": "https://registry.npmjs.org/",

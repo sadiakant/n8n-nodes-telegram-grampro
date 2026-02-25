@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      n8n-workflow:
+        specifier: ^1.120.0 || ^2.0.0
+        version: 1.120.9
       telegram:
         specifier: ^2.26.22
         version: 2.26.22
@@ -39,12 +42,6 @@ importers:
       gulp:
         specifier: ^4.0.2
         version: 4.0.2
-      n8n-workflow:
-        specifier: '*'
-        version: 1.120.9
-      only-allow:
-        specifier: ^1.2.1
-        version: 1.2.2
       prettier:
         specifier: ^3.3.2
         version: 3.8.1
@@ -1643,10 +1640,6 @@ packages:
   once@1.4.0:
     resolution: {integrity: sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==}
 
-  only-allow@1.2.2:
-    resolution: {integrity: sha512-uxyNYDsCh5YIJ780G7hC5OHjVUr9reHsbZNMM80L9tZlTpb3hUzb36KXgW4ZUGtJKQnGA3xegmWg1BxhWV0jJA==}
-    hasBin: true
-
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
     engines: {node: '>= 0.8.0'}
@@ -2230,10 +2223,6 @@ packages:
 
   which-module@1.0.0:
     resolution: {integrity: sha512-F6+WgncZi/mJDrammbTuHe1q0R5hOXv/mBaiNA2TCNT/LTHusX0V+CJnj9XT8ki5ln2UZyyddDgHfCzyrOH7MQ==}
-
-  which-pm-runs@1.1.0:
-    resolution: {integrity: sha512-n1brCuqClxfFfq/Rb0ICg9giSZqCS+pLtccdag6C2HyufBrh3fBOiy9nb6ggRMvWOVH5GrdJskj5iGTZNxd7SA==}
-    engines: {node: '>=4'}
 
   which-typed-array@1.1.20:
     resolution: {integrity: sha512-LYfpUkmqwl0h9A2HL09Mms427Q1RZWuOHsukfVcKRq9q95iQxdw0ix1JQrqbcDR9PH1QDwf5Qo8OZb5lksZ8Xg==}
@@ -4074,10 +4063,6 @@ snapshots:
     dependencies:
       wrappy: 1.0.2
 
-  only-allow@1.2.2:
-    dependencies:
-      which-pm-runs: 1.1.0
-
   optionator@0.9.4:
     dependencies:
       deep-is: 0.1.4
@@ -4721,8 +4706,6 @@ snapshots:
       - supports-color
 
   which-module@1.0.0: {}
-
-  which-pm-runs@1.1.0: {}
 
   which-typed-array@1.1.20:
     dependencies:
