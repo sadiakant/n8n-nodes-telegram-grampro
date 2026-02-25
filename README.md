@@ -7,20 +7,38 @@
 [![Build Status](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/build.yml/badge.svg)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/build.yml)
 [![Publish Status](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/publish.yml/badge.svg)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/publish.yml)
 [![Socket Badge](https://badge.socket.dev/npm/package/n8n-nodes-telegram-grampro)](https://badge.socket.dev/npm/package/n8n-nodes-telegram-grampro)
+[![GitHub Issues](https://img.shields.io/github/issues/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/issues)
+[![GitHub Pull Requests](https://img.shields.io/github/issues-pr/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/pulls)
 
 [![npm version](https://badgen.net/npm/v/n8n-nodes-telegram-grampro)](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
-[![npm downloads](https://badgen.net/npm/dm/n8n-nodes-telegram-grampro)](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
+[![npm downloads/week](https://img.shields.io/npm/dw/n8n-nodes-telegram-grampro?logo=npm&logoColor=white)](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
+[![npm downloads/month](https://img.shields.io/npm/dm/n8n-nodes-telegram-grampro?logo=npm&logoColor=white)](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
+[![npm downloads/year](https://img.shields.io/npm/dy/n8n-nodes-telegram-grampro?logo=npm&logoColor=white)](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
 [![node version](https://badgen.net/npm/node/n8n-nodes-telegram-grampro)](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
 [![npm license](https://badgen.net/npm/license/n8n-nodes-telegram-grampro)](LICENSE)
+[![GitHub license](https://badgen.net/github/license/sadiakant/n8n-nodes-telegram-grampro)](LICENSE)
+[![npm total downloads](https://img.shields.io/npm/dt/n8n-nodes-telegram-grampro?logo=npm&logoColor=white)](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
+[![npm unpacked size](https://img.shields.io/npm/unpacked-size/n8n-nodes-telegram-grampro)](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
+[![npm types](https://img.shields.io/npm/types/n8n-nodes-telegram-grampro)](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
+[![npm collaborators](https://img.shields.io/npm/collaborators/n8n-nodes-telegram-grampro)](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
 
 [![github release](https://badgen.net/github/release/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/releases)
 [![github stars](https://badgen.net/github/stars/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/stargazers)
 [![github forks](https://badgen.net/github/forks/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/network/members)
 [![last commit](https://badgen.net/github/last-commit/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/commits/main)
+[![GitHub contributors](https://img.shields.io/github/contributors/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/graphs/contributors)
+[![GitHub watchers](https://img.shields.io/github/watchers/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/watchers)
+[![GitHub issues closed](https://img.shields.io/github/issues-closed/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/issues)
+[![GitHub PRs closed](https://img.shields.io/github/issues-pr-closed/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/pulls)
+[![Commit activity](https://img.shields.io/github/commit-activity/m/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/commits/main)
+[![telegram dependency](https://img.shields.io/badge/telegram-%5E2.26.22-2CA5E0?logo=telegram&logoColor=white)](https://www.npmjs.com/package/telegram)
+[![n8n-workflow peer dependency](https://img.shields.io/npm/dependency-version/n8n-nodes-telegram-grampro/peer/n8n-workflow)](https://www.npmjs.com/package/n8n-workflow)
 
 [![Telegram API](https://badgen.net/static/Telegram/API/229ED9)](https://core.telegram.org/api)
 [![TypeScript](https://badgen.net/static/TypeScript/5.x/3178C6)](https://www.typescriptlang.org/)
 [![n8n](https://badgen.net/static/n8n/Community%20Node/EA4B71)](https://n8n.io/)
+[![pnpm >= 9.1](https://img.shields.io/badge/pnpm-%3E%3D9.1-F69220?style=flat-square&logo=pnpm&logoColor=white)](https://pnpm.io/)
+[![Node >= 18.17](https://img.shields.io/badge/node-%3E%3D18.17-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 
 ## 🚀 Transform Your Telegram Automation
 
@@ -70,11 +88,11 @@ Telegram GramPro is a comprehensive n8n custom node that brings the full power o
 1. **Clone to n8n custom nodes directory**
 2. **Install dependencies**
    ```bash
-   npm install
+   pnpm install
    ```
 3. **Build the project**
    ```bash
-   npm run build
+   pnpm run build
    ```
 4. **Restart n8n** to load the custom node
 
@@ -87,11 +105,11 @@ Telegram GramPro is a comprehensive n8n custom node that brings the full power o
 2. **Move to n8n custom nodes directory**
 3. **Install dependencies**
    ```bash
-   npm install
+   pnpm install
    ```
 4. **Build the project**
    ```bash
-   npm run build
+   pnpm run build
    ```
 5. **Restart n8n** to load the custom node
 
@@ -227,87 +245,56 @@ For comprehensive troubleshooting guidance, common issues, and solutions, see ou
 
 ```
 n8n-nodes-telegram-grampro/
-├── .github/                 # GitHub specific configuration & metadata
-│   ├── workflows/           # CI/CD pipelines (Build & Publish)
-│   ├── CODE_OF_CONDUCT.md   # Community guidelines
-│   ├── CONTRIBUTING.md      # Instructions for developers
-│   ├── LICENSE              # Legal usage rights
-│   └── SECURITY.md          # Security policy and reporting
-├── docs/                    # Extended documentation & manuals
-│   ├── AUTHORIZATION_GUIDE.md # Steps for Telegram API auth
-│   ├── OPERATIONS_GUIDE.md    # Detailed node usage instructions
-│   └── TROUBLESHOOTING_GUIDE.md # Common errors and fixes
-├── src/                     # Source code
-│   ├── core/                # Core logic (Rate limiting, Encryption, Auth)
-│   ├── credentials/         # n8n Credential definitions
-│   ├── nodes/               # n8n Node implementations (Main & Trigger)
-│   │   ├── icons/           # Brand assets
-│   │   └── resources/       # API resource operations (Chat, Media, etc.)
-│   ├── types/               # TypeScript interfaces & types
-│   └── index.ts             # Library entry point
-├── .gitignore               # Files excluded from version control
-├── copy-assets.mjs          # Build script for static assets
-├── esbuild.config.mjs       # Fast bundling configuration
-├── package.json             # Dependencies and npm scripts
-├── README.md                # Project overview and quick start
-└── tsconfig.json            # TypeScript compiler settings
+|-- .github/                       # GitHub specific configuration & metadata
+|   |-- workflows/                 # CI/CD pipelines (Build & Publish)
+|   |-- CODE_OF_CONDUCT.md         # Community guidelines
+|   |-- CONTRIBUTING.md            # Instructions for developers
+|   |-- LICENSE                    # Legal usage rights
+|   `-- SECURITY.md                # Security policy and reporting
+|-- docs/                          # Extended documentation & manuals
+|   |-- AUTHORIZATION_GUIDE.md     # Steps for Telegram API auth
+|   |-- OPERATIONS_GUIDE.md        # Detailed node usage instructions
+|   |-- TROUBLESHOOTING_GUIDE.md   # Common errors and fixes
+|   `-- Workflows-Examples/        # Ready-to-import n8n workflow JSON files
+|       |-- Send messages from one user to multiple users.json
+|       `-- Send messages from folder chats to user.json
+|-- src/                           # Source code
+|   |-- core/                      # Core logic (Rate limiting, Encryption, Auth)
+|   |-- credentials/               # n8n Credential definitions
+|   |-- nodes/                     # n8n Node implementations (Main & Trigger)
+|   |   |-- icons/                 # Brand assets
+|   |   `-- resources/             # API resource operations (Chat, Media, etc.)
+|   |-- types/                     # TypeScript interfaces & types
+|   `-- index.ts                   # Library entry point
+|-- .gitignore                     # Files excluded from version control
+|-- copy-assets.mjs                # Build script for static assets
+|-- esbuild.config.mjs             # Fast bundling configuration
+|-- package.json                   # Dependencies and pnpm scripts
+|-- README.md                      # Project overview and quick start
+`-- tsconfig.json                  # TypeScript compiler settings
 ```
 
-## 🎨 Workflow Examples
+## Workflow Examples
 
-### **Basic Message Automation**
+Ready-to-import workflow examples are available in [`docs/Workflows-Examples`](./docs/Workflows-Examples):
 
-```
-1. Trigger (Webhook, Schedule, etc.)
-2. Telegram GramPro (Send Text)
-   ├── Chat ID: @channel_name
-   ├── Message: "Automated message from n8n"
-   └── Disable Link Preview: true
-3. Success/Failure handling
-```
+- [`Send messages from one user to multiple users.json`](./docs/Workflows-Examples/Send%20messages%20from%20one%20user%20to%20multiple%20users.json)
+- [`Send messages from folder chats to user.json`](./docs/Workflows-Examples/Send%20messages%20from%20folder%20chats%20to%20user.json)
 
-### **User Management Workflow**
+### How to Import in n8n
 
-```
-1. Trigger (New User Registration)
-2. Telegram GramPro (Add Member)
-   ├── Channel ID: @your_channel
-   └── User ID to Add: {{ $json.username }}
-3. Telegram GramPro (Send Welcome Message)
-   ├── Chat ID: @your_channel
-   └── Message: "Welcome {{ $json.name }}!"
-4. Success/Failure handling
-```
+1. Open n8n and create a new workflow.
+2. Use the workflow menu and select **Import from File**.
+3. Choose one of the JSON files from `docs/Workflows-Examples/`.
+4. Re-map `telegramApi` credentials to your own Telegram GramPro credential.
+5. Replace placeholders such as source/target chats, admin usernames, and sub-workflow IDs.
 
-### **Content Moderation Workflow**
+### What These Examples Cover
 
-```
-1. Trigger (Message Received)
-2. Telegram GramPro (Get Message Content)
-3. Content Analysis (External API)
-4. Conditional Logic
-   ├── If Spam → Ban User
-   ├── If Violation → Delete Message
-   └── If Clean → Continue
-5. Telegram GramPro (Notify Admins)
-6. Success/Failure handling
-```
+- **Send messages from one user to multiple users.json**: Pulls recent messages from one source, filters by recency and keyword/domain, then distributes to multiple target chats with flood-wait and error notifications.
+- **Send messages from folder chats to user.json**: Reads dialogs grouped by folders, filters recent media messages, then forwards matched content to a target user with scheduling and error handling.
 
-### **Advanced Media Handling Workflow**
-
-```
-1. Trigger (New Media Message)
-2. Telegram GramPro (Copy Restricted Content)
-   ├── Source Chat: @restricted_channel
-   ├── Message ID: {{ $json.messageId }}
-   └── Target Chat: @your_channel
-3. Telegram GramPro (Edit Message Media)
-   ├── New Media: {{ $json.processedMedia }}
-   └── Caption: "Enhanced content"
-4. Success/Failure handling
-```
-
-## 🔧 Advanced Configuration
+## Advanced Configuration
 
 ### **Environment Variables**
 
@@ -349,13 +336,13 @@ We welcome contributions to make Telegram GramPro even better!
 git clone https://github.com/sadiakant/n8n-nodes-telegram-grampro.git
 
 # Install dependencies
-npm install
+pnpm install
 
 # Start development mode
-npm run dev
+pnpm run dev
 
 # Build for production
-npm run build
+pnpm run build
 ```
 
 ### **Code Standards**

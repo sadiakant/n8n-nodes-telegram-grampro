@@ -946,50 +946,37 @@ Complete the authentication process and generate a session string with enhanced 
 | **Media** | Download Media Files | Media file handling with progress tracking |
 | **Channel** | Get Admin & Bots, Get Public Members, Add/Remove Member, Ban/Unban User, Promote to Admin | Channel and group administration with granular permissions |
 
-## 🎨 Workflow Integration Examples
+## Workflow Integration Examples
 
-### **Content Moderation Workflow**
-```
-1. Trigger (New Message)
-2. Telegram GramPro (Get Message Content)
-3. Content Analysis (External API)
-4. Conditional Logic
-   ├── If Spam → Ban User
-   ├── If Violation → Delete Message
-   └── If Clean → Continue
-5. Telegram GramPro (Notify Admins)
-```
+Ready-to-import examples are available in [`docs/Workflows-Examples`](./Workflows-Examples):
 
-### **User Onboarding Workflow**
-```
-1. Trigger (New User Registration)
-2. Telegram GramPro (Add Member)
-3. Telegram GramPro (Send Welcome Message)
-4. Telegram GramPro (Pin Rules)
-```
+- [`Send messages from one user to multiple users.json`](./Workflows-Examples/Send%20messages%20from%20one%20user%20to%20multiple%20users.json)
+- [`Send messages from folder chats to user.json`](./Workflows-Examples/Send%20messages%20from%20folder%20chats%20to%20user.json)
 
-### **Content Distribution Workflow**
-```
-1. Trigger (New Content)
-2. Telegram GramPro (Send Text)
-3. Telegram GramPro (Send Poll)
-4. Telegram GramPro (Pin Message)
-```
+### Import Steps
 
-### **Advanced Media Handling Workflow**
-```
-1. Trigger (New Media Message)
-2. Telegram GramPro (Copy Restricted Content)
-   ├── Source Chat: @restricted_channel
-   ├── Message ID: {{ $json.messageId }}
-   └── Target Chat: @your_channel
-3. Telegram GramPro (Edit Message Media)
-   ├── New Media: {{ $json.processedMedia }}
-   └── Caption: "Enhanced content"
-4. Success/Failure handling
-```
+1. In n8n, open a workflow and choose **Import from File**.
+2. Select one of the files from `docs/Workflows-Examples/`.
+3. Reassign `telegramApi` credentials to your environment.
+4. Replace placeholders (`Source_Username`, `Target_Bot_Username`, `your_admin_user`, workflow IDs, and sample chat IDs).
 
-## 🚨 Best Practices
+### Example A: One Source to Multiple Destinations
+
+- File: `Send messages from one user to multiple users.json`
+- Reads recent messages from a single source chat.
+- Filters messages by recency, direction, and domain text match.
+- Distributes output across destination chat IDs with flood-wait control.
+- Sends admin success/error notifications and can call a follow-up workflow.
+
+### Example B: Folder Chats to Target User
+
+- File: `Send messages from folder chats to user.json`
+- Uses `getDialogs` grouped by folders to discover source chats.
+- Pulls recent media messages (`photo`) from each source.
+- Filters and forwards/copies matched messages to a target user.
+- Includes schedule trigger, wait nodes, and error notification branches.
+
+## Best Practices
 
 ### **Message Operations**
 - Use appropriate chat IDs (numeric, username, or invite links)

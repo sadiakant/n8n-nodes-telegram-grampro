@@ -1,0 +1,299 @@
+{
+	"nodes": [
+		{
+			"parameters": {
+				"options": {}
+			},
+			"id": "node-split-channels",
+			"name": "Loop Channels",
+			"type": "n8n-nodes-base.splitInBatches",
+			"typeVersion": 3,
+			"position": [-448, 848]
+		},
+		{
+			"parameters": {
+				"jsCode": "const now = Date.now();\nconst limit = now - (24 * 60 * 60 * 1000);\n\nconst filteredItems = items.filter(i => {\n  const item = i.json;\n  if (!item.date) return false;\n  const msgTime = item.date * 1000;\n  if (msgTime <= limit) return false;\n  if (item.isOutgoing === true) return false;\n  const messageText = item.text || \"\";\n  if (!messageText.toLowerCase().includes('example-domain.com')) return false;\n  return true;\n});\n\nreturn filteredItems.map(i => {\n  return {\n    json: {\n      sourceName: String(i.json.sourceName),\n      sourceId: String(i.json.sourceId),\n      message_id: String(i.json.id)\n    }\n  };\n});"
+			},
+			"id": "node-filter-logic",
+			"name": "Filter Logic (24h/Reply)",
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [16, 944],
+			"alwaysOutputData": true
+		},
+		{
+			"parameters": {
+				"jsCode": "return items.filter(i => {\n  const msgId = i.json.message_id || i.json.id;\n  const chatId = i.json.sourceId;\n  return (msgId != null && msgId !== \"\" && chatId != null && chatId !== \"\");\n}).map(i => {\n  return {\n    json: {\n      message_id: String(i.json.message_id || i.json.id),\n      chat_id: String(i.json.sourceId)\n    }\n  };\n});"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [-224, 560],
+			"id": "node-remove-invalid",
+			"name": "Filter Logic (Remove Invalid Messages)"
+		},
+		{
+			"parameters": {
+				"options": {}
+			},
+			"type": "n8n-nodes-base.splitInBatches",
+			"typeVersion": 3,
+			"position": [16, 464],
+			"id": "node-loop-items",
+			"name": "Loop Over Items"
+		},
+		{
+			"parameters": {
+				"operation": "getHistory",
+				"chatId": "={{ $json.id }}",
+				"mode": "hours",
+				"maxMessages": 3,
+				"onlyMedia": true,
+				"mediaType": ["photo"]
+			},
+			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"typeVersion": 1,
+			"position": [-208, 960],
+			"id": "node-get-history",
+			"name": "GetHistory message",
+			"alwaysOutputData": true,
+			"credentials": {
+				"telegramApi": {
+					"id": "your-cred-id",
+					"name": "Telegram-Auth"
+				}
+			},
+			"onError": "continueErrorOutput"
+		},
+		{
+			"parameters": {
+				"operation": "copyMessage",
+				"sourceChatId": "={{ $json.chat_id }}",
+				"targetChatId": "Target_Bot_Username",
+				"messageId": "={{ $json.message_id }}"
+			},
+			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"typeVersion": 1,
+			"position": [224, 656],
+			"id": "node-send-messages",
+			"name": "Send Messages to User",
+			"credentials": {
+				"telegramApi": {
+					"id": "your-cred-id",
+					"name": "Telegram-Auth"
+				}
+			},
+			"onError": "continueErrorOutput"
+		},
+		{
+			"parameters": {
+				"amount": 2
+			},
+			"type": "n8n-nodes-base.wait",
+			"typeVersion": 1.1,
+			"position": [448, 736],
+			"id": "node-wait-2s",
+			"name": "Flood Wait (2 Sec)"
+		},
+		{
+			"parameters": {
+				"chatId": "your_admin_user",
+				"text": "=Hello {{ $input.all().length }} Message sent.\n\nDate: {{ $now.setZone('Asia/Kolkata').format('dd-MMM-yyyy') }}\nTime: {{ $now.setZone('Asia/Kolkata').format('hh:mm a') }}\n- Workflow Completed"
+			},
+			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"typeVersion": 1,
+			"position": [448, 464],
+			"id": "node-notify-success",
+			"name": "Send Message to Admin",
+			"executeOnce": true,
+			"credentials": {
+				"telegramApi": {
+					"id": "your-cred-id",
+					"name": "Telegram-Auth"
+				}
+			}
+		},
+		{
+			"parameters": {
+				"workflowId": {
+					"__rl": true,
+					"value": "sub-workflow-id-placeholder",
+					"mode": "list"
+				},
+				"workflowInputs": {
+					"mappingMode": "defineBelow",
+					"value": {}
+				},
+				"options": {
+					"waitForSubWorkflow": false
+				}
+			},
+			"type": "n8n-nodes-base.executeWorkflow",
+			"typeVersion": 1.3,
+			"position": [672, 464],
+			"id": "node-sub-workflow",
+			"name": "Call Next Workflow",
+			"alwaysOutputData": false
+		},
+		{
+			"parameters": {
+				"amount": 2,
+				"unit": "minutes"
+			},
+			"type": "n8n-nodes-base.wait",
+			"typeVersion": 1.1,
+			"position": [224, 464],
+			"id": "node-wait-2m",
+			"name": "Wait 2 Min"
+		},
+		{
+			"parameters": {
+				"chatId": "your_admin_user",
+				"text": "=Error in {{ $workflow.name }}.\n- Failed Node: Send Messages\n- Error: {{ $json.error }}"
+			},
+			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"typeVersion": 1,
+			"position": [448, 928],
+			"id": "node-error-1",
+			"name": "Send Error Message (1)",
+			"credentials": {
+				"telegramApi": {
+					"id": "your-cred-id",
+					"name": "Telegram-Auth"
+				}
+			}
+		},
+		{
+			"parameters": {
+				"chatId": "your_admin_user",
+				"text": "=Error in {{ $workflow.name }}.\n- Failed Node: GetHistory\n- Error: {{ $json.error }}"
+			},
+			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"typeVersion": 1,
+			"position": [16, 1136],
+			"id": "node-error-2",
+			"name": "Send Error Message (2)",
+			"credentials": {
+				"telegramApi": {
+					"id": "your-cred-id",
+					"name": "Telegram-Auth"
+				}
+			}
+		},
+		{
+			"parameters": {
+				"fieldToSplitOut": "Source_Data_Field",
+				"options": {}
+			},
+			"type": "n8n-nodes-base.splitOut",
+			"typeVersion": 1,
+			"position": [-672, 848],
+			"id": "node-split-out",
+			"name": "Split Out"
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"options": {
+						"caseSensitive": true,
+						"typeValidation": "strict"
+					},
+					"conditions": [
+						{
+							"id": "condition-1",
+							"leftValue": "={{ $json.Source_Data_Field.length }}",
+							"rightValue": 0,
+							"operator": {
+								"type": "number",
+								"operation": "gt"
+							}
+						}
+					]
+				}
+			},
+			"type": "n8n-nodes-base.filter",
+			"typeVersion": 2.3,
+			"position": [-896, 848],
+			"id": "node-main-filter",
+			"name": "Filter"
+		},
+		{
+			"parameters": {
+				"resource": "chat",
+				"operation": "getDialogs",
+				"groupByFolders": true
+			},
+			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"typeVersion": 1,
+			"position": [-1120, 848],
+			"id": "node-get-chats",
+			"name": "Get Chats List",
+			"credentials": {
+				"telegramApi": {
+					"id": "your-cred-id",
+					"name": "Telegram-Auth"
+				}
+			}
+		},
+		{
+			"parameters": {
+				"rule": {
+					"interval": [
+						{
+							"triggerAtHour": 18
+						}
+					]
+				}
+			},
+			"id": "node-trigger",
+			"name": "Daily Trigger",
+			"type": "n8n-nodes-base.scheduleTrigger",
+			"typeVersion": 1.1,
+			"position": [-1344, 848]
+		}
+	],
+	"connections": {
+		"Loop Channels": {
+			"main": [
+				[{ "node": "Filter Logic (Remove Invalid Messages)", "type": "main", "index": 0 }],
+				[{ "node": "GetHistory message", "type": "main", "index": 0 }]
+			]
+		},
+		"Filter Logic (24h/Reply)": {
+			"main": [[{ "node": "Loop Channels", "type": "main", "index": 0 }]]
+		},
+		"Filter Logic (Remove Invalid Messages)": {
+			"main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]]
+		},
+		"Loop Over Items": {
+			"main": [
+				[{ "node": "Wait 2 Min", "type": "main", "index": 0 }],
+				[{ "node": "Send Messages to User", "type": "main", "index": 0 }]
+			]
+		},
+		"GetHistory message": {
+			"main": [
+				[{ "node": "Filter Logic (24h/Reply)", "type": "main", "index": 0 }],
+				[{ "node": "Send Error Message (2)", "type": "main", "index": 0 }]
+			]
+		},
+		"Send Messages to User": {
+			"main": [
+				[{ "node": "Flood Wait (2 Sec)", "type": "main", "index": 0 }],
+				[{ "node": "Send Error Message (1)", "type": "main", "index": 0 }]
+			]
+		},
+		"Flood Wait (2 Sec)": { "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]] },
+		"Send Message to Admin": {
+			"main": [[{ "node": "Call Next Workflow", "type": "main", "index": 0 }]]
+		},
+		"Wait 2 Min": { "main": [[{ "node": "Send Message to Admin", "type": "main", "index": 0 }]] },
+		"Split Out": { "main": [[{ "node": "Loop Channels", "type": "main", "index": 0 }]] },
+		"Filter": { "main": [[{ "node": "Split Out", "type": "main", "index": 0 }]] },
+		"Get Chats List": { "main": [[{ "node": "Filter", "type": "main", "index": 0 }]] },
+		"Daily Trigger": { "main": [[{ "node": "Get Chats List", "type": "main", "index": 0 }]] }
+	},
+	"meta": {
+		"templateCredsSetupCompleted": true,
+		"instanceId": "random-instance-id-string"
+	}
+}
