@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-telegram-grampro",
-	"version": "4.0.1",
+	"version": "4.0.2",
 	"description": "Telegram GramPro is Telegram automation nodes for n8n that uses user account for automation.",
 	"license": "MIT",
 	"keywords": [
@@ -15,7 +15,7 @@
 		"workflow",
 		"n8n-community-node-package"
 	],
-	"packageManager": "pnpm@10.30.1",
+	"packageManager": "pnpm@10.30.3",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"scripts": {

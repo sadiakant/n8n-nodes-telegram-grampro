@@ -36,27 +36,6 @@ export class TelegramApi implements ICredentialType {
 		},
 
 		{
-			displayName: 'Mobile Number',
-			name: 'phoneNumber',
-			type: 'string',
-			default: '',
-			required: true,
-			description: 'Your Telegram mobile number with country code (e.g., +1234567890)',
-			placeholder: '+1234567890',
-		},
-
-		{
-			displayName: '2FA Code (Optional)',
-			name: 'twoFactorCode',
-			type: 'string',
-			typeOptions: {
-				password: true,
-			},
-			default: '',
-			required: false,
-			description: 'Your Telegram 2FA code if enabled',
-		},
-		{
 			displayName: 'Session String',
 			name: 'session',
 			type: 'string',
@@ -64,7 +43,7 @@ export class TelegramApi implements ICredentialType {
 				password: true,
 			},
 			default: '',
-			required: false,
+			required: true,
 			description:
 				'The session string obtained from the "Complete Login" operation. Paste the full string here.',
 		},
