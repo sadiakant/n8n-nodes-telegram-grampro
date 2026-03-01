@@ -49,17 +49,22 @@ async function getChannelParticipants(
 	const rawLimit = this.getNodeParameter('limit', i, null) as number | null;
 	// When left empty in n8n, rawLimit may be null; treat null/undefined/NaN as "all"
 	const limit = typeof rawLimit === 'number' && !isNaN(rawLimit) ? rawLimit : Infinity;
+	const normalizedLimit = limit > 0 ? limit : Infinity;
 	const filterAdmins = this.getNodeParameter('filterAdmins', i, false);
 	const filterBots = this.getNodeParameter('filterBots', i, false);
 	const onlyOnline = this.getNodeParameter('onlyOnline', i, false);
 	const excludeAdmins = this.getNodeParameter('excludeAdmins', i, false);
 	const excludeBots = this.getNodeParameter('excludeBots', i, false);
 	const excludeDeletedAndLongAgo = this.getNodeParameter('excludeDeletedAndLongAgo', i, false);
+	const hasIncludeToggles = filterAdmins || filterBots || onlyOnline;
+	const hasExcludeToggles = excludeAdmins || excludeBots || excludeDeletedAndLongAgo;
+	const hasAnyToggle = hasIncludeToggles || hasExcludeToggles;
 
 	const channel = await resolveChannelEntity(client, channelId);
 
 	let allParticipants: any[] = [];
 	const usersById = new Map<string, any>();
+	const fetchAllBeforeFiltering = hasAnyToggle || normalizedLimit === Infinity;
 
 	if (channel.className === 'Chat') {
 		// Basic Group
@@ -86,22 +91,15 @@ async function getChannelParticipants(
 		}));
 	} else {
 		// Channels and Supergroups (className === 'Channel')
-		// Choose Telegram native filters to avoid post-filtering misses
-		let apiFilter: any = new Api.ChannelParticipantsRecent();
-		// Exclusion overrides inclusion: if exclude is true, do not use narrow inclusion filters
-		if (!excludeAdmins && !excludeBots) {
-			if (filterAdmins && filterBots) {
-				apiFilter = new Api.ChannelParticipantsAdmins();
-			} else if (filterAdmins) {
-				apiFilter = new Api.ChannelParticipantsAdmins();
-			} else if (filterBots) {
-				apiFilter = new Api.ChannelParticipantsBots();
-			}
-		}
+		// Always fetch broad participant pages when any toggle is active, then apply node filters in-memory.
+		// This guarantees toggle combinations are evaluated from the full fetched member set.
+		const apiFilter: any = fetchAllBeforeFiltering
+			? new Api.ChannelParticipantsSearch({ q: '' })
+			: new Api.ChannelParticipantsRecent();
 
 		// Telegram API caps to ~200 per call; loop until we reach requested limit or exhaust
 		let offset = 0;
-		let remaining = limit;
+		let remaining = fetchAllBeforeFiltering ? Infinity : normalizedLimit;
 
 		while (true) {
 			const batchSize = remaining === Infinity ? 200 : Math.min(remaining, 200);
@@ -137,55 +135,22 @@ async function getChannelParticipants(
 
 	let participants: any[] = allParticipants;
 
-	// Post-filtering for Chat since we couldn't use server-side API filters
-	if (channel.className === 'Chat') {
-		if (!excludeAdmins && !excludeBots) {
-			if (filterAdmins && filterBots) {
-				participants = participants.filter(
-					(p: any) =>
-						(p.isAdmin || p.isCreator) && usersById.get(p.userId?.toString())?.bot === true,
-				);
-			} else if (filterAdmins) {
-				participants = participants.filter((p: any) => p.isAdmin || p.isCreator);
-			} else if (filterBots) {
-				participants = participants.filter(
-					(p: any) => usersById.get(p.userId?.toString())?.bot === true,
-				);
-			}
-		}
-
-		// Apply limit manually for Chat since we got all participants at once
-		if (limit !== Infinity) {
-			participants = participants.slice(0, limit);
-		}
-	} else {
-		// For Channel, we used ChannelParticipantsAdmins when both filterAdmins and filterBots were true,
-		// so we need to manually filter bots now.
-		if (filterAdmins && filterBots) {
-			participants = participants.filter((p: any) => {
-				const u = usersById.get(p.userId?.toString());
-				return u?.bot === true;
-			});
-		}
-	}
-
-	if (onlyOnline) {
+	if (hasIncludeToggles) {
 		const nowSec = Math.floor(Date.now() / 1000);
 		participants = participants.filter((p: any) => {
 			const u = usersById.get(p.userId?.toString());
-			if (!u?.status) return false;
+			const roleIncluded =
+				filterAdmins || filterBots
+					? (filterAdmins && isParticipantAdmin(p)) || (filterBots && u?.bot === true)
+					: true;
+			const onlineIncluded = onlyOnline ? isOnlineOrRecentlyActive(u?.status, nowSec) : true;
 
-			const status = u.status;
-			// Treat explicit online, recently, or statuses with future expires as online
-			if (status._ === 'UserStatusOnline') return true;
-			if (status._ === 'UserStatusRecently') return true;
-			if (typeof status.expires === 'number' && status.expires > nowSec) return true;
-			return false;
+			return roleIncluded && onlineIncluded;
 		});
 	}
 
 	if (excludeAdmins) {
-		participants = participants.filter((p: any) => !(p.adminRights || p.isAdmin || p.isCreator));
+		participants = participants.filter((p: any) => !isParticipantAdmin(p));
 	}
 
 	if (excludeBots) {
@@ -199,12 +164,13 @@ async function getChannelParticipants(
 		participants = participants.filter((p: any) => {
 			const u = usersById.get(p.userId?.toString());
 			if (!u) return false;
-			if (u.deleted) return false;
-			const status = u.status;
-			if (!status) return true;
-			if (status._ === 'UserStatusLongAgo') return false;
-			return true;
+			return !isDeletedOrLongAgo(u);
 		});
+	}
+
+	// Apply user limit after all toggles to keep toggle outputs accurate.
+	if (normalizedLimit !== Infinity) {
+		participants = participants.slice(0, normalizedLimit);
 	}
 
 	const items = participants.map((p: any) => {
@@ -216,9 +182,9 @@ async function getChannelParticipants(
 				firstName: user.firstName || '',
 				lastName: user.lastName || '',
 				bot: user.bot || false,
-				isAdmin: !!p.adminRights || !!p.isAdmin,
-				isCreator: !!p.isCreator,
-				status: user.status?._ || 'Unknown',
+				isAdmin: isParticipantAdmin(p),
+				isCreator: isParticipantCreator(p),
+				status: getStatusType(user.status) || 'Unknown',
 				phone: user.phone || null,
 			},
 			pairedItem: { item: i },
@@ -226,6 +192,55 @@ async function getChannelParticipants(
 	});
 
 	return items;
+}
+
+function getStatusType(status: any): string | undefined {
+	if (!status) return undefined;
+	return status.className || status._;
+}
+
+function isOnlineOrRecentlyActive(status: any, nowSec: number): boolean {
+	const statusType = getStatusType(status);
+	if (!statusType) return false;
+
+	if (statusType === 'UserStatusOnline' || statusType === 'Online') return true;
+	if (statusType === 'UserStatusRecently' || statusType === 'Recently') return true;
+
+	const expiresRaw = status.expires;
+	const expires =
+		typeof expiresRaw === 'bigint'
+			? Number(expiresRaw)
+			: typeof expiresRaw === 'number'
+				? expiresRaw
+				: undefined;
+
+	return typeof expires === 'number' && expires > nowSec;
+}
+
+function isParticipantCreator(participant: any): boolean {
+	const participantType = participant?.className || participant?._;
+	return (
+		participant?.isCreator === true ||
+		participantType === 'ChannelParticipantCreator' ||
+		participantType === 'ChatParticipantCreator'
+	);
+}
+
+function isParticipantAdmin(participant: any): boolean {
+	const participantType = participant?.className || participant?._;
+	return (
+		participant?.isAdmin === true ||
+		participant?.adminRights != null ||
+		participantType === 'ChannelParticipantAdmin' ||
+		participantType === 'ChatParticipantAdmin' ||
+		isParticipantCreator(participant)
+	);
+}
+
+function isDeletedOrLongAgo(user: any): boolean {
+	if (user?.deleted === true) return true;
+	const statusType = getStatusType(user?.status);
+	return statusType === 'UserStatusLongAgo' || statusType === 'LongAgo';
 }
 
 async function addChannelMember(
