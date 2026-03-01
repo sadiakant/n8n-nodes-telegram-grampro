@@ -1082,13 +1082,14 @@ export class TelegramMtproto implements INodeType {
 						],
 					},
 				},
-				description: 'Channel or group ID, username (@channel), or invite link',
+				placeholder: '"username" or "12345678" or "-100123456789" without ""',
+				description: 'Channel or group ID, username (channel), or invite link',
 			},
 			{
 				displayName: 'Limit',
 				name: 'limit',
 				type: 'number',
-				default: 50,
+				default: '',
 				required: false,
 				displayOptions: {
 					show: {
@@ -1096,7 +1097,8 @@ export class TelegramMtproto implements INodeType {
 						operation: ['getMembers'],
 					},
 				},
-				description: 'Maximum number of members to retrieve (leave empty to get all)',
+				placeholder: 'Leave empty to get all members',
+				description: 'Maximum 10,000 members to retrieve due to API Limit (leave empty to get all)',
 			},
 			{
 				displayName: 'Filter Online & Recently Active',
