@@ -3,20 +3,18 @@ import { getClient } from '../../core/clientManager';
 import { safeExecute } from '../../core/floodWaitHandler';
 import { withRateLimit } from '../../core/rateLimiter';
 import { Api } from 'telegram';
+import { LogLevel } from 'telegram/extensions/Logger';
 
-
-export async function channelRouter(this: IExecuteFunctions, operation: string, i: number): Promise<INodeExecutionData[]> {
-
+export async function channelRouter(
+	this: IExecuteFunctions,
+	operation: string,
+	i: number,
+): Promise<INodeExecutionData[]> {
 	const creds: any = await this.getCredentials('telegramApi');
 
-	const client = await getClient(
-		creds.apiId,
-		creds.apiHash,
-		creds.session,
-	);
+	const client = await getClient(creds.apiId, creds.apiHash, creds.session);
 
 	switch (operation) {
-
 		case 'getMembers':
 			return getChannelParticipants.call(this, client, i);
 
@@ -42,11 +40,15 @@ export async function channelRouter(this: IExecuteFunctions, operation: string, 
 
 // ----------------
 
-async function getChannelParticipants(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
+async function getChannelParticipants(
+	this: IExecuteFunctions,
+	client: any,
+	i: number,
+): Promise<INodeExecutionData[]> {
 	const channelId = this.getNodeParameter('channelId', i);
 	const rawLimit = this.getNodeParameter('limit', i, null) as number | null;
 	// When left empty in n8n, rawLimit may be null; treat null/undefined/NaN as "all"
-	const limit = (typeof rawLimit === 'number' && !isNaN(rawLimit)) ? rawLimit : Infinity;
+	const limit = typeof rawLimit === 'number' && !isNaN(rawLimit) ? rawLimit : Infinity;
 	const filterAdmins = this.getNodeParameter('filterAdmins', i, false);
 	const filterBots = this.getNodeParameter('filterBots', i, false);
 	const onlyOnline = this.getNodeParameter('onlyOnline', i, false);
@@ -56,60 +58,115 @@ async function getChannelParticipants(this: IExecuteFunctions, client: any, i: n
 
 	const channel = await resolveChannelEntity(client, channelId);
 
-	// Choose Telegram native filters to avoid post-filtering misses
-	let apiFilter: any = new Api.ChannelParticipantsRecent();
-	// Exclusion overrides inclusion: if exclude is true, do not use narrow inclusion filters
-	if (!excludeAdmins && !excludeBots) {
-		if (filterAdmins && filterBots) {
-			apiFilter = new Api.ChannelParticipantsAdmins();
-		} else if (filterAdmins) {
-			apiFilter = new Api.ChannelParticipantsAdmins();
-		} else if (filterBots) {
-			apiFilter = new Api.ChannelParticipantsBots();
-		}
-	}
-
-	// Telegram API caps to ~200 per call; loop until we reach requested limit or exhaust
-	let offset = 0;
-	let remaining = limit;
-	const allParticipants: any[] = [];
+	let allParticipants: any[] = [];
 	const usersById = new Map<string, any>();
 
-	while (true) {
-		const batchSize = remaining === Infinity ? 200 : Math.min(remaining, 200);
-
+	if (channel.className === 'Chat') {
+		// Basic Group
 		const result: any = await withRateLimit(async () =>
 			safeExecute(() =>
-				client.invoke(new Api.channels.GetParticipants({
-					channel,
-					filter: apiFilter,
-					offset,
-					limit: batchSize,
-					hash: BigInt(0) as any,
-				}))
-			)
+				client.invoke(
+					new Api.messages.GetFullChat({
+						chatId: channel.id,
+					}),
+				),
+			),
 		);
 
 		(result.users || []).forEach((u: any) => usersById.set(u.id?.toString(), u));
 
-		const participantsBatch: any[] = result.participants || [];
-		allParticipants.push(...participantsBatch);
+		const chatParticipants = result.fullChat?.participants?.participants || [];
 
-		// Update counters
-		offset += participantsBatch.length;
-		if (remaining !== Infinity) remaining -= participantsBatch.length;
+		// Map normal chat participant structure to look somewhat like channel participants
+		allParticipants = chatParticipants.map((p: any) => ({
+			userId: p.userId,
+			adminRights: undefined, // Normal groups don't have granular admin rights in this list
+			isAdmin: p.className === 'ChatParticipantAdmin',
+			isCreator: p.className === 'ChatParticipantCreator',
+		}));
+	} else {
+		// Channels and Supergroups (className === 'Channel')
+		// Choose Telegram native filters to avoid post-filtering misses
+		let apiFilter: any = new Api.ChannelParticipantsRecent();
+		// Exclusion overrides inclusion: if exclude is true, do not use narrow inclusion filters
+		if (!excludeAdmins && !excludeBots) {
+			if (filterAdmins && filterBots) {
+				apiFilter = new Api.ChannelParticipantsAdmins();
+			} else if (filterAdmins) {
+				apiFilter = new Api.ChannelParticipantsAdmins();
+			} else if (filterBots) {
+				apiFilter = new Api.ChannelParticipantsBots();
+			}
+		}
 
-		// Stop if less than requested returned or we've hit the user-requested limit
-		if (participantsBatch.length < batchSize) break;
-		if (remaining !== Infinity && remaining <= 0) break;
+		// Telegram API caps to ~200 per call; loop until we reach requested limit or exhaust
+		let offset = 0;
+		let remaining = limit;
+
+		while (true) {
+			const batchSize = remaining === Infinity ? 200 : Math.min(remaining, 200);
+
+			const result: any = await withRateLimit(async () =>
+				safeExecute(() =>
+					client.invoke(
+						new Api.channels.GetParticipants({
+							channel,
+							filter: apiFilter,
+							offset,
+							limit: batchSize,
+							hash: BigInt(0) as any,
+						}),
+					),
+				),
+			);
+
+			(result.users || []).forEach((u: any) => usersById.set(u.id?.toString(), u));
+
+			const participantsBatch: any[] = result.participants || [];
+			allParticipants.push(...participantsBatch);
+
+			// Update counters
+			offset += participantsBatch.length;
+			if (remaining !== Infinity) remaining -= participantsBatch.length;
+
+			// Stop if less than requested returned or we've hit the user-requested limit
+			if (participantsBatch.length < batchSize) break;
+			if (remaining !== Infinity && remaining <= 0) break;
+		}
 	}
 
 	let participants: any[] = allParticipants;
-	if (filterAdmins && filterBots) {
-		participants = participants.filter((p: any) => {
-			const u = usersById.get(p.userId?.toString());
-			return u?.bot === true;
-		});
+
+	// Post-filtering for Chat since we couldn't use server-side API filters
+	if (channel.className === 'Chat') {
+		if (!excludeAdmins && !excludeBots) {
+			if (filterAdmins && filterBots) {
+				participants = participants.filter(
+					(p: any) =>
+						(p.isAdmin || p.isCreator) && usersById.get(p.userId?.toString())?.bot === true,
+				);
+			} else if (filterAdmins) {
+				participants = participants.filter((p: any) => p.isAdmin || p.isCreator);
+			} else if (filterBots) {
+				participants = participants.filter(
+					(p: any) => usersById.get(p.userId?.toString())?.bot === true,
+				);
+			}
+		}
+
+		// Apply limit manually for Chat since we got all participants at once
+		if (limit !== Infinity) {
+			participants = participants.slice(0, limit);
+		}
+	} else {
+		// For Channel, we used ChannelParticipantsAdmins when both filterAdmins and filterBots were true,
+		// so we need to manually filter bots now.
+		if (filterAdmins && filterBots) {
+			participants = participants.filter((p: any) => {
+				const u = usersById.get(p.userId?.toString());
+				return u?.bot === true;
+			});
+		}
 	}
 
 	if (onlyOnline) {
@@ -128,7 +185,7 @@ async function getChannelParticipants(this: IExecuteFunctions, client: any, i: n
 	}
 
 	if (excludeAdmins) {
-		participants = participants.filter((p: any) => !(p.adminRights || p.isAdmin));
+		participants = participants.filter((p: any) => !(p.adminRights || p.isAdmin || p.isCreator));
 	}
 
 	if (excludeBots) {
@@ -171,43 +228,53 @@ async function getChannelParticipants(this: IExecuteFunctions, client: any, i: n
 	return items;
 }
 
-async function addChannelMember(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
+async function addChannelMember(
+	this: IExecuteFunctions,
+	client: any,
+	i: number,
+): Promise<INodeExecutionData[]> {
 	const channelId = this.getNodeParameter('channelId', i);
 	const userIdToAdd = this.getNodeParameter('userIdToAdd', i);
 
 	// Get the channel and user entities
-	const channel = await client.getEntity(channelId);
+	const channel = await resolveChannelEntity(client, channelId);
 	const user = await client.getEntity(userIdToAdd);
 
 	try {
 		// Add user to channel/group
 		await withRateLimit(async () =>
 			safeExecute(() =>
-				client.invoke(new Api.channels.InviteToChannel({
-					channel: channel,
-					users: [user]
-				}))
-			)
+				client.invoke(
+					new Api.channels.InviteToChannel({
+						channel: channel,
+						users: [user],
+					}),
+				),
+			),
 		);
 
-		return [{
-			json: {
-				success: true,
-				message: `Successfully added user ${userIdToAdd} to channel ${channelId}`,
-				userId: user.id?.toString(),
-				channelId: channel.id?.toString(),
+		return [
+			{
+				json: {
+					success: true,
+					message: `Successfully added user ${userIdToAdd} to channel ${channelId}`,
+					userId: user.id?.toString(),
+					channelId: channel.id?.toString(),
+				},
+				pairedItem: { item: i },
 			},
-			pairedItem: { item: i },
-		}];
+		];
 	} catch (error) {
-		return [{
-			json: {
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-				message: `Failed to add user ${userIdToAdd} to channel ${channelId}`,
+		return [
+			{
+				json: {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+					message: `Failed to add user ${userIdToAdd} to channel ${channelId}`,
+				},
+				pairedItem: { item: i },
 			},
-			pairedItem: { item: i },
-		}];
+		];
 	}
 }
 
@@ -216,205 +283,266 @@ async function resolveChannelEntity(client: any, rawId: any): Promise<any> {
 	const attempts: any[] = [];
 	const asString = typeof rawId === 'string' ? rawId.trim() : String(rawId);
 
-	// 1) original input
-	attempts.push(asString);
-
-	// 2) if numeric without sign, try -100 prefix (supergroup/channel)
-	if (/^\\d+$/.test(asString) && !asString.startsWith('-')) {
+	// Instead of throwing positive digits at GramJS (which forces User resolution),
+	// intelligently format the prefixes to minimize guess-errors logged in the terminal.
+	if (/^\d+$/.test(asString) && !asString.startsWith('-')) {
+		// Pure positive numbers. Telegram groups/channels are negative.
+		// Try Supergroup/Channel first (-100), then Basic Group (-).
 		attempts.push(`-100${asString}`);
-	}
-
-	// 3) if starts with -100 already, also try without minus for completeness
-	if (asString.startsWith('-100')) {
-		attempts.push(asString.replace('-100', ''));
+		attempts.push(`-${asString}`);
+	} else if (asString.startsWith('-100')) {
+		// Starts with -100. It's properly formatted for Supergroup/Channel.
+		// If it fails, maybe it's actually a standard group? Try replacing -100 with just -.
+		attempts.push(asString);
+		attempts.push(asString.replace('-100', '-'));
+	} else if (asString.startsWith('-')) {
+		// Starts with - (but not -100). Properly formatted for Basic Group.
+		// If it fails, maybe it's a Supergroup and they missed the 100?
+		attempts.push(asString);
+		attempts.push(asString.replace('-', '-100'));
+	} else {
+		// Likely a screen name (@username)
+		attempts.push(asString);
 	}
 
 	let lastError: any = null;
-	for (const candidate of attempts) {
-		try {
-			return await client.getEntity(candidate);
-		} catch (err) {
-			lastError = err;
+	const originalLogLevel = client.logger.level;
+
+	try {
+		// Temporarily silence RPC errors during trial-and-error resolution
+		client.setLogLevel(LogLevel.NONE);
+
+		for (const candidate of attempts) {
+			try {
+				const entity = await client.getEntity(candidate);
+				if (entity.className === 'Channel' || entity.className === 'Chat') {
+					return entity;
+				}
+				lastError = new Error(
+					`Resolved entity for ${candidate} is a ${entity.className}, but expected a Channel or Chat`,
+				);
+			} catch (err) {
+				lastError = err;
+			}
 		}
+	} finally {
+		// Restore original log level
+		client.setLogLevel(originalLogLevel);
 	}
 
 	throw lastError || new Error('Failed to resolve channel entity');
 }
 
-async function removeChannelMember(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
+async function removeChannelMember(
+	this: IExecuteFunctions,
+	client: any,
+	i: number,
+): Promise<INodeExecutionData[]> {
 	const channelId = this.getNodeParameter('channelId', i);
 	const userIdToRemove = this.getNodeParameter('userIdToRemove', i);
 
 	// Get the channel and user entities
-	const channel = await client.getEntity(channelId);
+	const channel = await resolveChannelEntity(client, channelId);
 	const user = await client.getEntity(userIdToRemove);
 
 	try {
 		// Remove user from channel/group (kick them)
 		await withRateLimit(async () =>
 			safeExecute(() =>
-				client.invoke(new Api.channels.EditBanned({
-					channel: channel,
-					participant: user,
-					bannedRights: new Api.ChatBannedRights({
-						viewMessages: true,
-						sendMessages: true,
-						sendMedia: true,
-						sendStickers: true,
-						sendGifs: true,
-						sendGames: true,
-						sendInline: true,
-						embedLinks: true,
-						sendPolls: true,
-						changeInfo: true,
-						inviteUsers: true,
-						pinMessages: true,
-						untilDate: 0,
-					})
-				}))
-			)
+				client.invoke(
+					new Api.channels.EditBanned({
+						channel: channel,
+						participant: user,
+						bannedRights: new Api.ChatBannedRights({
+							viewMessages: true,
+							sendMessages: true,
+							sendMedia: true,
+							sendStickers: true,
+							sendGifs: true,
+							sendGames: true,
+							sendInline: true,
+							embedLinks: true,
+							sendPolls: true,
+							changeInfo: true,
+							inviteUsers: true,
+							pinMessages: true,
+							untilDate: 0,
+						}),
+					}),
+				),
+			),
 		);
 
-		return [{
-			json: {
-				success: true,
-				message: `Successfully removed user ${userIdToRemove} from channel ${channelId}`,
-				userId: user.id?.toString(),
-				channelId: channel.id?.toString(),
+		return [
+			{
+				json: {
+					success: true,
+					message: `Successfully removed user ${userIdToRemove} from channel ${channelId}`,
+					userId: user.id?.toString(),
+					channelId: channel.id?.toString(),
+				},
+				pairedItem: { item: i },
 			},
-			pairedItem: { item: i },
-		}];
+		];
 	} catch (error) {
-		return [{
-			json: {
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-				message: `Failed to remove user ${userIdToRemove} from channel ${channelId}`,
+		return [
+			{
+				json: {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+					message: `Failed to remove user ${userIdToRemove} from channel ${channelId}`,
+				},
+				pairedItem: { item: i },
 			},
-			pairedItem: { item: i },
-		}];
+		];
 	}
 }
 
-async function banUser(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
+async function banUser(
+	this: IExecuteFunctions,
+	client: any,
+	i: number,
+): Promise<INodeExecutionData[]> {
 	const channelId = this.getNodeParameter('channelId', i);
 	const userIdToBan = this.getNodeParameter('userIdToBan', i);
 	const banDuration = this.getNodeParameter('banDuration', i, 1);
 	const banReason = this.getNodeParameter('banReason', i, '');
 
 	// Get the channel and user entities
-	const channel = await client.getEntity(channelId);
+	const channel = await resolveChannelEntity(client, channelId);
 	const user = await client.getEntity(userIdToBan);
 
 	try {
 		// Calculate ban until date
-		const banDurationNum = typeof banDuration === 'number' ? banDuration : parseInt(banDuration as string, 10);
-		const untilDate = banDurationNum === 0 ? 0 : Math.floor(Date.now() / 1000) + (banDurationNum * 24 * 60 * 60);
+		const banDurationNum =
+			typeof banDuration === 'number' ? banDuration : parseInt(banDuration as string, 10);
+		const untilDate =
+			banDurationNum === 0 ? 0 : Math.floor(Date.now() / 1000) + banDurationNum * 24 * 60 * 60;
 
 		// Ban user from channel/group
 		await withRateLimit(async () =>
 			safeExecute(() =>
-				client.invoke(new Api.channels.EditBanned({
-					channel: channel,
-					participant: user,
-					bannedRights: new Api.ChatBannedRights({
-						viewMessages: true,
-						sendMessages: true,
-						sendMedia: true,
-						sendStickers: true,
-						sendGifs: true,
-						sendGames: true,
-						sendInline: true,
-						embedLinks: true,
-						sendPolls: true,
-						changeInfo: true,
-						inviteUsers: true,
-						pinMessages: true,
-						untilDate: untilDate,
-					})
-				}))
-			)
+				client.invoke(
+					new Api.channels.EditBanned({
+						channel: channel,
+						participant: user,
+						bannedRights: new Api.ChatBannedRights({
+							viewMessages: true,
+							sendMessages: true,
+							sendMedia: true,
+							sendStickers: true,
+							sendGifs: true,
+							sendGames: true,
+							sendInline: true,
+							embedLinks: true,
+							sendPolls: true,
+							changeInfo: true,
+							inviteUsers: true,
+							pinMessages: true,
+							untilDate: untilDate,
+						}),
+					}),
+				),
+			),
 		);
 
-		return [{
-			json: {
-				success: true,
-				message: `Successfully banned user ${userIdToBan} from channel ${channelId} for ${banDuration === 0 ? 'permanent' : banDuration + ' days'}`,
-				userId: user.id?.toString(),
-				channelId: channel.id?.toString(),
-				banDuration: banDuration,
-				banReason: banReason || 'No reason provided',
+		return [
+			{
+				json: {
+					success: true,
+					message: `Successfully banned user ${userIdToBan} from channel ${channelId} for ${banDuration === 0 ? 'permanent' : banDuration + ' days'}`,
+					userId: user.id?.toString(),
+					channelId: channel.id?.toString(),
+					banDuration: banDuration,
+					banReason: banReason || 'No reason provided',
+				},
+				pairedItem: { item: i },
 			},
-			pairedItem: { item: i },
-		}];
+		];
 	} catch (error) {
-		return [{
-			json: {
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-				message: `Failed to ban user ${userIdToBan} from channel ${channelId}`,
+		return [
+			{
+				json: {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+					message: `Failed to ban user ${userIdToBan} from channel ${channelId}`,
+				},
+				pairedItem: { item: i },
 			},
-			pairedItem: { item: i },
-		}];
+		];
 	}
 }
 
-async function unbanUser(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
+async function unbanUser(
+	this: IExecuteFunctions,
+	client: any,
+	i: number,
+): Promise<INodeExecutionData[]> {
 	const channelId = this.getNodeParameter('channelId', i);
 	const userIdToUnban = this.getNodeParameter('userIdToUnban', i);
 
 	// Get the channel and user entities
-	const channel = await client.getEntity(channelId);
+	const channel = await resolveChannelEntity(client, channelId);
 	const user = await client.getEntity(userIdToUnban);
 
 	try {
 		// Unban user from channel/group (remove all restrictions)
 		await withRateLimit(async () =>
 			safeExecute(() =>
-				client.invoke(new Api.channels.EditBanned({
-					channel: channel,
-					participant: user,
-					bannedRights: new Api.ChatBannedRights({
-						viewMessages: false,
-						sendMessages: false,
-						sendMedia: false,
-						sendStickers: false,
-						sendGifs: false,
-						sendGames: false,
-						sendInline: false,
-						embedLinks: false,
-						sendPolls: false,
-						changeInfo: false,
-						inviteUsers: false,
-						pinMessages: false,
-						untilDate: 0,
-					})
-				}))
-			)
+				client.invoke(
+					new Api.channels.EditBanned({
+						channel: channel,
+						participant: user,
+						bannedRights: new Api.ChatBannedRights({
+							viewMessages: false,
+							sendMessages: false,
+							sendMedia: false,
+							sendStickers: false,
+							sendGifs: false,
+							sendGames: false,
+							sendInline: false,
+							embedLinks: false,
+							sendPolls: false,
+							changeInfo: false,
+							inviteUsers: false,
+							pinMessages: false,
+							untilDate: 0,
+						}),
+					}),
+				),
+			),
 		);
 
-		return [{
-			json: {
-				success: true,
-				message: `Successfully unbanned user ${userIdToUnban} from channel ${channelId}`,
-				userId: user.id?.toString(),
-				channelId: channel.id?.toString(),
+		return [
+			{
+				json: {
+					success: true,
+					message: `Successfully unbanned user ${userIdToUnban} from channel ${channelId}`,
+					userId: user.id?.toString(),
+					channelId: channel.id?.toString(),
+				},
+				pairedItem: { item: i },
 			},
-			pairedItem: { item: i },
-		}];
+		];
 	} catch (error) {
-		return [{
-			json: {
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-				message: `Failed to unban user ${userIdToUnban} from channel ${channelId}`,
+		return [
+			{
+				json: {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+					message: `Failed to unban user ${userIdToUnban} from channel ${channelId}`,
+				},
+				pairedItem: { item: i },
 			},
-			pairedItem: { item: i },
-		}];
+		];
 	}
 }
 
-async function promoteUser(this: IExecuteFunctions, client: any, i: number): Promise<INodeExecutionData[]> {
+async function promoteUser(
+	this: IExecuteFunctions,
+	client: any,
+	i: number,
+): Promise<INodeExecutionData[]> {
 	const channelId = this.getNodeParameter('channelId', i);
 	const userIdToPromote = this.getNodeParameter('userIdToPromote', i);
 	const adminTitle = String(this.getNodeParameter('adminTitle', i, 'Admin'));
@@ -435,7 +563,7 @@ async function promoteUser(this: IExecuteFunctions, client: any, i: number): Pro
 	const canDeleteStories = Boolean(this.getNodeParameter('canDeleteStories', i, false));
 
 	// Get the channel and user entities
-	const channel = await client.getEntity(channelId);
+	const channel = await resolveChannelEntity(client, channelId);
 	const user = await client.getEntity(userIdToPromote);
 
 	try {
@@ -445,77 +573,85 @@ async function promoteUser(this: IExecuteFunctions, client: any, i: number): Pro
 		// Promote user to admin
 		await withRateLimit(async () =>
 			safeExecute(() =>
-				client.invoke(new Api.channels.EditAdmin({
-					channel: channel,
-					userId: user,
-					adminRights: new Api.ChatAdminRights({
-						changeInfo: canChangeInfo,
-						postMessages: canPostMessages,
-						editMessages: canEditMessages,
-						deleteMessages: canDeleteMessages,
-						banUsers: canRestrictMembers,
-						inviteUsers: canInviteUsers,
-						pinMessages: canPinMessages,
-						addAdmins: canPromoteMembers,
-						anonymous: false, // Don't allow anonymous posting by default
-						manageCall: canManageVoiceChats,
-						other: canManageChat,
-						postStories: canPostStories,
-						editStories: canEditStories,
-						deleteStories: canDeleteStories,
+				client.invoke(
+					new Api.channels.EditAdmin({
+						channel: channel,
+						userId: user,
+						adminRights: new Api.ChatAdminRights({
+							changeInfo: canChangeInfo,
+							postMessages: canPostMessages,
+							editMessages: canEditMessages,
+							deleteMessages: canDeleteMessages,
+							banUsers: canRestrictMembers,
+							inviteUsers: canInviteUsers,
+							pinMessages: canPinMessages,
+							addAdmins: canPromoteMembers,
+							anonymous: false, // Don't allow anonymous posting by default
+							manageCall: canManageVoiceChats,
+							other: canManageChat,
+							postStories: canPostStories,
+							editStories: canEditStories,
+							deleteStories: canDeleteStories,
+						}),
+						rank: adminTitle,
 					}),
-					rank: adminTitle,
-				}))
-			)
+				),
+			),
 		);
 
-		return [{
-			json: {
-				success: true,
-				message: `Successfully promoted user ${userIdToPromote} to admin in channel ${channelId}`,
-				userId: user.id?.toString(),
-				channelId: channel.id?.toString(),
-				adminTitle: adminTitle,
-				permissions: {
-					canChangeInfo,
-					canPostMessages,
-					canEditMessages,
-					canDeleteMessages,
-					canInviteUsers,
-					canRestrictMembers,
-					canPinMessages,
-					canPromoteMembers,
-					canManageChat,
-					canManageVoiceChats,
-					canPostStories,
-					canEditStories,
-					canDeleteStories,
+		return [
+			{
+				json: {
+					success: true,
+					message: `Successfully promoted user ${userIdToPromote} to admin in channel ${channelId}`,
+					userId: user.id?.toString(),
+					channelId: channel.id?.toString(),
+					adminTitle: adminTitle,
+					permissions: {
+						canChangeInfo,
+						canPostMessages,
+						canEditMessages,
+						canDeleteMessages,
+						canInviteUsers,
+						canRestrictMembers,
+						canPinMessages,
+						canPromoteMembers,
+						canManageChat,
+						canManageVoiceChats,
+						canPostStories,
+						canEditStories,
+						canDeleteStories,
+					},
 				},
+				pairedItem: { item: i },
 			},
-			pairedItem: { item: i },
-		}];
+		];
 	} catch (error) {
 		// Enhanced error handling for permission issues
 		const errorMessage = error instanceof Error ? error.message : String(error);
 
 		if (errorMessage.includes('RIGHT_FORBIDDEN') || errorMessage.includes('CHAT_ADMIN_REQUIRED')) {
-			return [{
-				json: {
-					success: false,
-					error: "RIGHT_FORBIDDEN: You don't have permission to promote users to admin",
-					message: `You need admin rights with 'addAdmins' permission or be the channel creator to promote users in channel ${channelId}. Original Error: ${errorMessage}`,
+			return [
+				{
+					json: {
+						success: false,
+						error: "RIGHT_FORBIDDEN: You don't have permission to promote users to admin",
+						message: `You need admin rights with 'addAdmins' permission or be the channel creator to promote users in channel ${channelId}. Original Error: ${errorMessage}`,
+					},
+					pairedItem: { item: i },
 				},
-				pairedItem: { item: i },
-			}];
+			];
 		}
 
-		return [{
-			json: {
-				success: false,
-				error: errorMessage,
-				message: `Failed to promote user ${userIdToPromote} to admin in channel ${channelId}`,
+		return [
+			{
+				json: {
+					success: false,
+					error: errorMessage,
+					message: `Failed to promote user ${userIdToPromote} to admin in channel ${channelId}`,
+				},
+				pairedItem: { item: i },
 			},
-			pairedItem: { item: i },
-		}];
+		];
 	}
 }
