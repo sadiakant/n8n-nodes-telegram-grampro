@@ -134,19 +134,29 @@ async function getChannelParticipants(
 	}
 
 	let participants: any[] = allParticipants;
+	const matchedByUserId = new Map<string, string[]>();
 
 	if (hasIncludeToggles) {
 		const nowSec = Math.floor(Date.now() / 1000);
 		participants = participants.filter((p: any) => {
 			const u = usersById.get(p.userId?.toString());
-			const roleIncluded =
-				filterAdmins || filterBots
-					? (filterAdmins && isParticipantAdmin(p)) || (filterBots && u?.bot === true)
-					: true;
-			const onlineIncluded = onlyOnline ? isOnlineOrRecentlyActive(u?.status, nowSec) : true;
+			const reasons: string[] = [];
+			if (filterAdmins && isParticipantAdmin(p)) reasons.push('admin');
+			if (filterBots && u?.bot === true) reasons.push('bot');
+			if (onlyOnline && isOnlineOrRecentlyActive(u?.status, nowSec)) reasons.push('onlineOrRecent');
 
-			return roleIncluded && onlineIncluded;
+			// Include toggles are additive (OR): any enabled include condition can keep the member.
+			const userId = p.userId?.toString();
+			if (reasons.length > 0 && userId) {
+				matchedByUserId.set(userId, reasons);
+			}
+			return reasons.length > 0;
 		});
+	} else {
+		for (const p of participants) {
+			const userId = p.userId?.toString();
+			if (userId) matchedByUserId.set(userId, ['allMembers']);
+		}
 	}
 
 	if (excludeAdmins) {
@@ -175,6 +185,7 @@ async function getChannelParticipants(
 
 	const items = participants.map((p: any) => {
 		const user = usersById.get(p.userId?.toString()) || {};
+		const userId = p.userId?.toString();
 		return {
 			json: {
 				id: user.id?.toString(),
@@ -186,6 +197,7 @@ async function getChannelParticipants(
 				isCreator: isParticipantCreator(p),
 				status: getStatusType(user.status) || 'Unknown',
 				phone: user.phone || null,
+				matchedBy: userId ? matchedByUserId.get(userId) || [] : [],
 			},
 			pairedItem: { item: i },
 		};
