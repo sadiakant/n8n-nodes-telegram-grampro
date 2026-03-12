@@ -13,7 +13,7 @@ import { logger } from '../core/logger';
 export class TelegramTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Telegram GramPro Trigger',
-		icon: 'file:icons/telegram.svg',
+		icon: 'file:telegram-grampro.svg',
 		name: 'telegramMtprotoTrigger',
 		group: ['trigger'],
 		version: 1,
