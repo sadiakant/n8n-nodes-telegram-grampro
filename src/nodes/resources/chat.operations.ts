@@ -5,12 +5,9 @@ import { Api } from 'telegram';
 
 import { cache, CacheKeys } from '../../core/cache';
 
-export async function chatRouter(
-	this: IExecuteFunctions,
-	operation: string,
-	i: number,
-): Promise<INodeExecutionData[]> {
-	const creds: any = await this.getCredentials('telegramApi');
+export async function chatRouter(this: IExecuteFunctions, operation: string, i: number): Promise<INodeExecutionData[]> {
+
+	const creds: any = await this.getCredentials('telegramGramProApi');
 
 	const client = await getClient(creds.apiId, creds.apiHash, creds.session);
 

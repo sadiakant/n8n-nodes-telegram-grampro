@@ -52,7 +52,7 @@
 			"id": "node-tg-get",
 			"name": "Get Messages from Source",
 			"credentials": {
-				"telegramApi": {
+				"telegramGramProApi": {
 					"id": "cleaned-cred-id",
 					"name": "Telegram_Account"
 				}
@@ -72,7 +72,7 @@
 			"id": "node-tg-copy",
 			"name": "Send Messages to My Channels",
 			"credentials": {
-				"telegramApi": {
+				"telegramGramProApi": {
 					"id": "cleaned-cred-id",
 					"name": "Telegram_Account"
 				}
@@ -91,7 +91,7 @@
 			"name": "Send Message to Admin",
 			"executeOnce": true,
 			"credentials": {
-				"telegramApi": {
+				"telegramGramProApi": {
 					"id": "cleaned-cred-id",
 					"name": "Telegram_Account"
 				}
@@ -118,7 +118,7 @@
 			"id": "node-tg-clear",
 			"name": "Clear User History",
 			"credentials": {
-				"telegramApi": {
+				"telegramGramProApi": {
 					"id": "cleaned-cred-id",
 					"name": "Telegram_Account"
 				}
@@ -148,7 +148,7 @@
 			"id": "node-tg-error",
 			"name": "Send Error Message",
 			"credentials": {
-				"telegramApi": {
+				"telegramGramProApi": {
 					"id": "cleaned-cred-id",
 					"name": "Telegram_Account"
 				}

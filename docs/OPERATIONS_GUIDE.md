@@ -957,7 +957,7 @@ Ready-to-import examples are available in [`docs/Workflows-Examples`](./Workflow
 
 1. In n8n, open a workflow and choose **Import from File**.
 2. Select one of the files from `docs/Workflows-Examples/`.
-3. Reassign `telegramApi` credentials to your environment.
+3. Reassign `telegramGramProApi` credentials to your environment.
 4. Replace placeholders (`Source_Username`, `Target_Bot_Username`, `your_admin_user`, workflow IDs, and sample chat IDs).
 
 ### Example A: One Source to Multiple Destinations

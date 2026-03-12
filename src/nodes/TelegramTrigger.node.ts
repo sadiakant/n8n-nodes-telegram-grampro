@@ -13,7 +13,7 @@ import { logger } from '../core/logger';
 export class TelegramTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Telegram GramPro Trigger',
-		icon: 'file:telegram-grampro.svg',
+		icon: 'file:icons/telegram.svg',
 		name: 'telegramMtprotoTrigger',
 		group: ['trigger'],
 		version: 1,
@@ -25,17 +25,19 @@ export class TelegramTrigger implements INodeType {
 		outputs: ['main' as any],
 		credentials: [
 			{
-				name: 'telegramApi',
+				name: 'telegramGramProApi',
 				required: true,
 				testedBy: 'testTelegramApi',
-			},
+			}
 		],
 		properties: [
 			{
 				displayName: 'Events',
 				name: 'events',
 				type: 'multiOptions',
-				options: [{ name: 'New Message', value: 'newMessage' }],
+				options: [
+					{ name: 'New Message', value: 'newMessage' },
+				],
 				default: ['newMessage'],
 				required: true,
 				description: 'The events to listen for',
@@ -45,8 +47,7 @@ export class TelegramTrigger implements INodeType {
 				name: 'chats',
 				type: 'string',
 				default: '',
-				description:
-					'Specific Chat IDs, Usernames, or Invite Links to listen to. Leave empty to listen to all chats.',
+				description: 'Specific Chat IDs, Usernames, or Invite Links to listen to. Leave empty to listen to all chats.',
 			},
 			{
 				displayName: 'Incoming Messages',
@@ -73,7 +74,7 @@ export class TelegramTrigger implements INodeType {
 
 	// eslint-disable-next-line no-unused-vars
 	async trigger(this: ITriggerFunctions): Promise<ITriggerResponse> {
-		const creds = (await this.getCredentials('telegramApi')) as any;
+		const creds = await this.getCredentials('telegramGramProApi') as any;
 
 		if (!creds) {
 			throw new NodeOperationError(this.getNode(), 'No credentials found');

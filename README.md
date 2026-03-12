@@ -286,7 +286,7 @@ Ready-to-import workflow examples are available in [`docs/Workflows-Examples`](.
 1. Open n8n and create a new workflow.
 2. Use the workflow menu and select **Import from File**.
 3. Choose one of the JSON files from `docs/Workflows-Examples/`.
-4. Re-map `telegramApi` credentials to your own Telegram GramPro credential.
+4. Re-map `telegramGramProApi` credentials to your own Telegram GramPro credential.
 5. Replace placeholders such as source/target chats, admin usernames, and sub-workflow IDs.
 
 ### What These Examples Cover
