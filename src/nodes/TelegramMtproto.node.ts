@@ -283,7 +283,11 @@ export class TelegramMtproto implements INodeType {
 						value: 'requestCode',
 						action: 'Request Login Code',
 					},
-					{ name: 'Complete Login', value: 'signIn', action: 'Complete Login' },
+					{
+						name: 'Complete Login',
+						value: 'signIn',
+						action: 'Complete Login'
+					},
 				],
 				default: 'requestCode',
 			},
@@ -342,6 +346,19 @@ export class TelegramMtproto implements INodeType {
 				description: 'The verification code sent to your phone',
 			},
 			{
+				displayName: 'Two-Step Verification Password',
+				name: 'password2fa',
+				type: 'string',
+				default: '={{ $json.password2fa }}',
+				displayOptions: {
+					show: {
+						resource: ['authentication'],
+						operation: ['requestCode', 'signIn'],
+					},
+				},
+				description: 'Optional 2FA password if your account has 2FA enabled',
+			},
+			{
 				displayName: 'Phone Code Hash',
 				name: 'phoneCodeHash',
 				type: 'string',
@@ -365,24 +382,7 @@ export class TelegramMtproto implements INodeType {
 						operation: ['signIn'],
 					},
 				},
-				description:
-					'The temporary session string returned by the Request Code operation',
-			},
-			{
-				displayName: 'Two-Step Verification Password',
-				name: 'password2fa',
-				type: 'string',
-				typeOptions: {
-					password: true,
-				},
-				default: '={{ $json.password2fa }}',
-				displayOptions: {
-					show: {
-						resource: ['authentication'],
-						operation: ['signIn'],
-					},
-				},
-				description: 'Optional 2FA password if your account has 2FA enabled',
+				description: 'The temporary session string returned by the Request Code operation',
 			},
 
 			// COMMON FIELDS
@@ -514,7 +514,7 @@ export class TelegramMtproto implements INodeType {
 						operation: ['sendText'],
 					},
 				},
-				description: 'Upload a photo, video, or document with the message',
+				description: 'Upload a photo, video, or document with the message.',
 			},
 			{
 				displayName: 'Media Type',

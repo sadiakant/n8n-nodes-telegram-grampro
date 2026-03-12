@@ -87,7 +87,9 @@ export class TelegramApi implements ICredentialType {
 			}
 		} catch (error) {
 			const mapped = mapTelegramError(error);
-			throw new Error(`getMe verification failed: ${mapped.userMessage}`);
+			throw new Error(`getMe verification failed: ${mapped.userMessage}`, {
+				cause: error,
+			});
 		}
 
 		return requestOptions;
