@@ -5,7 +5,7 @@ import {
 	INodeTypeDescription,
 	NodeOperationError,
 } from 'n8n-workflow';
-import { testTelegramApi } from '../credentials/TelegramApi.credentials';
+import { testTelegramApi } from '../credentials/TelegramGramProApi.credentials';
 
 import { messageRouter } from './resources/message.operations';
 import { chatRouter } from './resources/chat.operations';
