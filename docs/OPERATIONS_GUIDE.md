@@ -867,7 +867,7 @@ Download media files from messages with progress tracking and enhanced error han
 
 ### **Authentication Operations**
 
-#### **Request Code**
+#### **Request Login Code**
 Request a verification code to be sent to your phone number with enhanced security.
 
 **Parameters:**
@@ -899,14 +899,56 @@ Request a verification code to be sent to your phone number with enhanced securi
 
 ---
 
-#### **Sign In & Generate**
+#### **Resend Login Code**
+Resend the login code using the next available delivery method.
+
+**Parameters:**
+- **API ID** and **API Hash**
+- **Phone Number**
+- **Phone Code Hash**
+- **Pre-Auth Session String**
+
+**Use Cases:**
+- Code not received within timeout
+- Delivery type is `app` but SMS/call is needed
+
+---
+
+#### **Request QR Login**
+Generate a QR login token and URL to scan in Telegram.
+
+**Parameters:**
+- **API ID** and **API Hash**
+
+**Use Cases:**
+- SMS delivery blocked or unreliable
+- Faster login on desktop
+
+**Output:**
+- `binary.qr` contains a PNG QR image for scanning in n8n.
+
+---
+
+#### **Complete QR Login**
+Finalize QR login after scanning the QR in Telegram.
+
+**Parameters:**
+- **API ID** and **API Hash**
+- **Pre-Auth Session String**
+
+**Use Cases:**
+- Finish QR authentication and get a session string
+
+---
+
+#### **Complete Login**
 Complete the authentication process and generate a session string with enhanced encryption.
 
 **Parameters:**
-- **API ID**: Your Telegram API ID (same as Request Code)
-- **API Hash**: Your Telegram API Hash (same as Request Code)
-- **Phone Number**: Your phone number (same as Request Code)
-- **Phone Code Hash**: The hash returned from Request Code operation
+- **API ID**: Your Telegram API ID (same as Request Login Code)
+- **API Hash**: Your Telegram API Hash (same as Request Login Code)
+- **Phone Number**: Your phone number (same as Request Login Code)
+- **Phone Code Hash**: The hash returned from Request Login Code operation
 - **Phone Code**: The verification code sent to your phone
 - **2FA Password** (Optional): Your 2FA password if your account has 2FA enabled
 
@@ -939,7 +981,7 @@ Complete the authentication process and generate a session string with enhanced 
 
 | Resource | Operations | Description |
 |----------|------------|-------------|
-| **Session Generator** | Request Code, Sign In & Generate | Account authentication and setup with enhanced security |
+| **Session Generator** | Request Login Code, Resend Login Code, Request QR Login, Complete QR Login, Complete Login | Account authentication and setup with enhanced security |
 | **Message** | Send Text, Get Messages, Edit, Delete, Pin, Forward, Copy, Edit Media, Unpin, Create Poll, Copy Restricted Content | Complete message management with advanced features |
 | **Chat** | Get Chat, Get Dialogs, Join Channel/Group, Leave Channel/Group, Create Group/Channel | Chat and group operations with enhanced validation |
 | **User** | Get User Info, Get Full User Details, Update Profile, Change Username, Get Profile Photo | User information and management with privacy respect |
@@ -957,7 +999,7 @@ Ready-to-import examples are available in [`docs/Workflows-Examples`](./Workflow
 
 1. In n8n, open a workflow and choose **Import from File**.
 2. Select one of the files from `docs/Workflows-Examples/`.
-3. Reassign `telegramApi` credentials to your environment.
+3. Reassign `telegramGramProApi` credentials to your environment.
 4. Replace placeholders (`Source_Username`, `Target_Bot_Username`, `your_admin_user`, workflow IDs, and sample chat IDs).
 
 ### Example A: One Source to Multiple Destinations

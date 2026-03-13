@@ -50,9 +50,8 @@ export class SessionEncryption {
 
 			return `n8n:${combined.toString('base64')}`;
 		} catch (error) {
-			throw new Error(
-				`Session encryption failed: ${error instanceof Error ? error.message : String(error)}`,
-			);
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(`Session encryption failed: ${message}`, { cause: error });
 		}
 	}
 
@@ -84,9 +83,8 @@ export class SessionEncryption {
 			const decryptedBuffer = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
 			return decryptedBuffer.toString('utf8');
 		} catch (error) {
-			throw new Error(
-				`Session decryption failed: ${error instanceof Error ? error.message : String(error)}`,
-			);
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(`Session decryption failed: ${message}`, { cause: error });
 		}
 	}
 

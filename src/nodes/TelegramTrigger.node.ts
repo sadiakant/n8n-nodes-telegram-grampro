@@ -1,9 +1,9 @@
 import {
-    ITriggerFunctions,
-    INodeType,
-    INodeTypeDescription,
-    ITriggerResponse,
-    NodeOperationError,
+	ITriggerFunctions,
+	INodeType,
+	INodeTypeDescription,
+	ITriggerResponse,
+	NodeOperationError,
 } from 'n8n-workflow';
 import { getClient } from '../core/clientManager';
 import { testTelegramApi } from '../credentials/TelegramApi.credentials';

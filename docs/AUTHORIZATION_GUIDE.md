@@ -15,68 +15,116 @@ Before starting, ensure you have:
 
 ## Authentication Flow
 
-### Step 1: Request Code Operation
+---
 
-**Purpose**: Request a verification code to be sent to your phone number.
+## Phone Login (OTP Authentication)
 
-**Configuration**:
-- **API ID**: Your Telegram API ID from https://my.telegram.org
-- **API Hash**: Your Telegram API Hash from https://my.telegram.org  
-- **Phone Number**: Your phone number in international format (e.g., +1234567890)
-- **2FA Password** (Optional): Your 2FA password if your account has 2FA enabled
+The Phone Login method uses a One-Time Password (OTP) sent to your Telegram app or via SMS.
 
-**Output**:
-```json
-{
-  "success": true,
-  "phoneCodeHash": "abc123...",
-  "apiId": 123456,
-  "apiHash": "abcdef...",
-  "phoneNumber": "+1234567890",
-  "password2fa": "your-2fa-password",
-  "message": "Code sent successfully. Use the phoneCodeHash in the Sign In operation."
-}
-```
+### Workflow Setup
 
-### Step 2: Sign In & Generate Operation
+![Request Login Code Setup](assets/phone-login/step1_request_code.jpg)
 
-**Purpose**: Complete the authentication process and generate a session string for use with other Telegram nodes.
+For a complete setup, we recommend connecting the nodes as shown above. This allows you to easily pass the `phoneCodeHash` and `preAuthSession` between steps.
 
-**Configuration**:
-- **API ID**: Your Telegram API ID (same as Request Code)
-- **API Hash**: Your Telegram API Hash (same as Request Code)
-- **Phone Number**: Your phone number (same as Request Code)
-- **Phone Code Hash**: The hash returned from Request Code operation
-- **Phone Code**: The verification code sent to your phone
-- **2FA Password** (Optional): Your 2FA password if your account has 2FA enabled
 
-**Output**:
-```json
-{
-  "success": true,
-  "sessionString": "123456:abcdef...",
-  "apiId": 123456,
-  "apiHash": "abcdef...",
-  "phoneNumber": "+1234567890",
-  "password2fa": "your-2fa-password",
-  "message": "Authentication successful. Use the sessionString in your Telegram nodes.",
-  "note": "IMPORTANT: Copy this sessionString output and save it to a text file for backup. Then restart your n8n instance to prevent \"Ghost Connection timeout\" errors in the terminal logs."
-}
-```
+### Step 1: Phone Login: Request Login Code
 
-## Drag and Drop Integration
+![Resend Code Setup](assets/phone-login/step2_resend_code.jpg)
 
-### Operation A to Operation B Connection
+1.  Add a **Telegram Auth** node.
+2.  Set Operation to **Phone Login: Request Login Code**.
+3.  Enter your **API ID**, **API Hash**, and **Phone Number** (international format).
+4.  (Optional) Enter your **2FA Password** if enabled.
+5.  **Execute the node**.
 
-To streamline your workflow, you can directly connect the output of Request Code to Sign In & Generate:
+> [!NOTE]
+> Telegram will prioritize sending the code to your active Telegram app. If you don't have the app open, check your SMS.
 
-1. **Run Operation A** (Request Code)
-2. **Drag the `phoneCodeHash` field** from Operation A's output
-3. **Drop it into the `phoneCodeHash` field** of Operation B's input
-4. **Enter your verification code** when prompted
-5. **Execute Operation B** to generate the session string
+### Step 2: Resend Login Code (Optional)
 
-This eliminates manual copying and reduces errors.
+![Phone Login Workflow Overview](assets/phone-login/phone_workflow_overview.jpg)
+
+If you haven't received the code within 60 seconds, or if you need the code via SMS instead of the app, you can use the **Resend Login Code** operation.
+
+1.  Add another **Telegram Auth** node.
+2.  Set Operation to **Phone Login: Resend Login Code**.
+3.  Link the output from "Request Login Code" to this node to automatically pass the **API ID**, **API Hash**, **Phone Number**, and **Phone Code Hash**.
+4.  **Execute the node** to trigger a new delivery method.
+
+### Step 3: Phone Login: Complete Login
+
+![Complete Login Setup & Result](assets/phone-login/step3_sign_in.jpg)
+
+Once you have the 5-digit verification code:
+
+1.  Add a **Telegram Auth** node.
+2.  Set Operation to **Phone Login: Complete Login**.
+3.  Link the previous node's output to automatically populate the required hashes.
+4.  Enter the **Verification Code** you received.
+5.  **Execute the node**.
+
+If successful, you will receive your **Session String** in the output JSON.
+
+---
+
+---
+
+---
+
+## QR Login (Recommended Fallback)
+
+QR login is the most reliable way to authenticate when SMS delivery is restricted by your carrier or region. It bypasses the need for OTP codes entirely.
+
+### Preparation
+
+Ensure you have your Telegram app open on your mobile device.
+
+1.  Open **Telegram** on your phone.
+2.  Go to **Settings** > **Devices**.
+
+![Telegram Settings](assets/qr-login/step1_tele_settings.jpg)
+
+3.  Tap on **Link Desktop Device**. This will open your camera for scanning.
+
+![Link Desktop Device](assets/qr-login/step2_tele_link_device.jpg)
+
+### n8n Workflow Setup
+
+Create a simple workflow with two Telegram Auth nodes:
+
+![n8n Workflow Overview](assets/qr-login/step3_n8n_workflow.jpg)
+
+### Step 1: Request QR Login
+
+1.  Add a **Telegram Auth** node to n8n.
+2.  Set Resource to **Authentication** and Operation to **Request QR Login**.
+3.  Enter your **API ID** and **API Hash**. 
+4.  **Execute the node**.
+
+You will see a QR code generated in the **Binary** output tab:
+
+![n8n QR Output](assets/qr-login/step4_n8n_qr_output.jpg)
+
+5.  **Scan this QR code** immediately with your phone. 
+
+> [!TIP]
+> The QR code expires quickly (usually 30-60 seconds). Scan it as soon as it appears.
+
+### Step 2: Complete QR Login
+
+1.  Add another **Telegram Auth** node.
+2.  Set Operation to **Complete QR Login**.
+3.  Fill in the parameters (API ID, API Hash).
+4.  **Pre-Auth Session String**: Pass the `preAuthSession` value from the output of Step 1.
+5.  **2FA Password**: If you have Two-Step Verification enabled, enter your password here.
+6.  **Execute the node**.
+
+If successful, you will receive your **Session String**:
+
+![n8n Session String Result](assets/qr-login/step5_n8n_session_output.jpg)
+
+---
 
 ## Session String Handling
 
@@ -93,7 +141,7 @@ The session string is encrypted automatically when used with the main Telegram n
 ## Phone Code Expiration - Quick Fix Guide
 
 ### Problem
-The error `PHONE_CODE_EXPIRED` occurs when the verification code sent to your phone has expired before you complete the Sign In operation.
+The error `PHONE_CODE_EXPIRED` occurs when the verification code sent to your phone has expired before you complete the Complete Login operation.
 
 ### Why This Happens
 - Telegram verification codes typically expire after **10-15 minutes**
@@ -103,8 +151,8 @@ The error `PHONE_CODE_EXPIRED` occurs when the verification code sent to your ph
 ### Solution
 
 #### Immediate Fix
-1. **Request a new code** using the Request Code operation
-2. **Complete the Sign In operation immediately** (within 10 minutes)
+1. **Request a new code** using the Request Login Code operation
+2. **Complete the Complete Login operation immediately** (within 10 minutes)
 3. **Use the new phoneCodeHash** from the fresh request
 
 #### Best Practices to Avoid This Issue
@@ -115,7 +163,7 @@ The error `PHONE_CODE_EXPIRED` occurs when the verification code sent to your ph
 
 **Workflow Optimization**:
 ```
-Request Code → Store phoneCodeHash → Get Phone Code from SMS → Sign In & Generate → Use Session String
+Request Login Code → Store phoneCodeHash → Get Phone Code from SMS → Complete Login → Use Session String
 ```
 
 **Error Handling**:
@@ -126,7 +174,7 @@ The updated node provides clear error messages:
 
 ### Step-by-Step Recovery
 
-1. **Run Request Code Operation**
+1. **Run Request Login Code Operation**
    ```json
    {
      "operation": "requestCode",
@@ -144,7 +192,7 @@ The updated node provides clear error messages:
    }
    ```
 
-3. **Immediately Run Sign In Operation**
+3. **Immediately Run Complete Login Operation**
    ```json
    {
      "operation": "signIn",
@@ -309,13 +357,13 @@ The generated `sessionString` can be used directly with:
 ## Example Complete Workflow
 
 ```
-1. Telegram Auth (Request Code)
+1. Telegram Auth (Request Login Code)
    ├── Input: API ID, API Hash, Phone Number
    └── Output: phoneCodeHash
 
 2. [Manual Step: Enter verification code]
 
-3. Telegram Auth (Sign In & Generate)
+3. Telegram Auth (Complete Login)
    ├── Input: All parameters + phoneCode + phoneCodeHash (drag & drop from step 1)
    └── Output: sessionString
 
@@ -364,4 +412,5 @@ This guide provides a complete authentication solution for integrating Telegram 
 - SESSION_PASSWORD_NEEDED: Account has 2FA enabled; provide password.
 - FLOOD_WAIT_X: Wait for Telegram rate-limit window before retrying.
 - NETWORK_TIMEOUT / ETIMEDOUT: Temporary network issue; retry.
+
 

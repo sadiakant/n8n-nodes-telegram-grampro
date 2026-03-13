@@ -57,7 +57,7 @@
 			"name": "GetHistory message",
 			"alwaysOutputData": true,
 			"credentials": {
-				"telegramApi": {
+				"telegramGramProApi": {
 					"id": "your-cred-id",
 					"name": "Telegram-Auth"
 				}
@@ -77,7 +77,7 @@
 			"id": "node-send-messages",
 			"name": "Send Messages to User",
 			"credentials": {
-				"telegramApi": {
+				"telegramGramProApi": {
 					"id": "your-cred-id",
 					"name": "Telegram-Auth"
 				}
@@ -106,7 +106,7 @@
 			"name": "Send Message to Admin",
 			"executeOnce": true,
 			"credentials": {
-				"telegramApi": {
+				"telegramGramProApi": {
 					"id": "your-cred-id",
 					"name": "Telegram-Auth"
 				}
@@ -156,7 +156,7 @@
 			"id": "node-error-1",
 			"name": "Send Error Message (1)",
 			"credentials": {
-				"telegramApi": {
+				"telegramGramProApi": {
 					"id": "your-cred-id",
 					"name": "Telegram-Auth"
 				}
@@ -173,7 +173,7 @@
 			"id": "node-error-2",
 			"name": "Send Error Message (2)",
 			"credentials": {
-				"telegramApi": {
+				"telegramGramProApi": {
 					"id": "your-cred-id",
 					"name": "Telegram-Auth"
 				}
@@ -228,7 +228,7 @@
 			"id": "node-get-chats",
 			"name": "Get Chats List",
 			"credentials": {
-				"telegramApi": {
+				"telegramGramProApi": {
 					"id": "your-cred-id",
 					"name": "Telegram-Auth"
 				}

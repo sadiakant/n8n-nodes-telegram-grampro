@@ -13,7 +13,7 @@ import { mapTelegramError } from '../core/telegramErrorMapper';
 export class TelegramApi implements ICredentialType {
 	name = 'telegramGramProApi';
 	displayName = 'Telegram GramPro API';
-	icon: ICredentialType['icon'] = 'file:telegram-grampro.svg';
+	icon: ICredentialType['icon'] = 'file:telegram-grampro-credentials.svg';
 
 	properties: INodeProperties[] = [
 		{
@@ -87,7 +87,9 @@ export class TelegramApi implements ICredentialType {
 			}
 		} catch (error) {
 			const mapped = mapTelegramError(error);
-			throw new Error(`getMe verification failed: ${mapped.userMessage}`);
+			throw new Error(`getMe verification failed: ${mapped.userMessage}`, {
+				cause: error,
+			});
 		}
 
 		return requestOptions;
