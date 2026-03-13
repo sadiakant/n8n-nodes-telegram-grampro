@@ -25,7 +25,7 @@ export class TelegramTrigger implements INodeType {
         outputs: ['main' as any],
         credentials: [
             {
-                name: 'telegramApi',
+                name: 'telegramGramProApi',
                 required: true,
                 testedBy: 'testTelegramApi',
             }

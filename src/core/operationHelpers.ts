@@ -25,7 +25,7 @@ export abstract class BaseOperation {
    * Initialize the Telegram client with credentials
    */
   protected async initializeClient(): Promise<void> {
-    const creds = await this.context.getCredentials('telegramApi') as any;
+    const creds = await this.context.getCredentials('telegramGramProApi') as any;
 
     if (!creds) {
       throw new Error('No Telegram credentials found');

@@ -28,7 +28,7 @@ export class TelegramMtproto implements INodeType {
 
 		credentials: [
 			{
-				name: 'telegramApi',
+				name: 'telegramGramProApi',
 				required: true,
 				testedBy: 'testTelegramApi',
 				displayOptions: {

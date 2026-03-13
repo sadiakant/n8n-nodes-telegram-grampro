@@ -4,7 +4,7 @@ import { safeExecute } from '../../core/floodWaitHandler';
 
 export async function mediaRouter(this: IExecuteFunctions, operation: string, i: number): Promise<INodeExecutionData[]> {
 
-	const creds: any = await this.getCredentials('telegramApi');
+	const creds: any = await this.getCredentials('telegramGramProApi');
 
 	const client = await getClient(
 		creds.apiId,

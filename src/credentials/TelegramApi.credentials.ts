@@ -11,7 +11,7 @@ import { getClient } from '../core/clientManager';
 import { mapTelegramError } from '../core/telegramErrorMapper';
 
 export class TelegramApi implements ICredentialType {
-	name = 'telegramApi';
+	name = 'telegramGramProApi';
 	displayName = 'Telegram GramPro API';
 	icon: ICredentialType['icon'] = 'file:telegram-grampro.svg';
 
