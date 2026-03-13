@@ -6,7 +6,7 @@ import {
 	NodeOperationError,
 } from 'n8n-workflow';
 import { getClient } from '../core/clientManager';
-import { testTelegramApi } from '../credentials/TelegramApi.credentials';
+import { testTelegramApi } from '../credentials/TelegramGramProApi.credentials';
 import { NewMessage } from 'telegram/events';
 import { logger } from '../core/logger';
 

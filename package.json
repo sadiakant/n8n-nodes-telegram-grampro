@@ -79,7 +79,7 @@
 			"dist/nodes/TelegramTrigger.node.js"
 		],
 		"credentials": [
-			"dist/credentials/TelegramApi.credentials.js"
+			"dist/credentials/TelegramGramProApi.credentials.js"
 		]
 	},
 	"files": [
