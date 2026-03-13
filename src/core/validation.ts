@@ -638,6 +638,55 @@ export function validateOperationParams(operation: string, params: any): Validat
 			}
 			break;
 
+		case 'resendCode':
+			if (!params.apiId) {
+				result.errors.push('API ID is required for resendCode operation');
+				result.isValid = false;
+			}
+			if (!params.apiHash) {
+				result.errors.push('API Hash is required for resendCode operation');
+				result.isValid = false;
+			}
+			if (!params.phoneNumber) {
+				result.errors.push('Phone number is required for resendCode operation');
+				result.isValid = false;
+			}
+			if (!params.phoneCodeHash) {
+				result.errors.push('Phone code hash is required for resendCode operation');
+				result.isValid = false;
+			}
+			if (!params.preAuthSession) {
+				result.errors.push('Pre-auth session is required for resendCode operation');
+				result.isValid = false;
+			}
+			break;
+
+		case 'requestQr':
+			if (!params.apiId) {
+				result.errors.push('API ID is required for requestQr operation');
+				result.isValid = false;
+			}
+			if (!params.apiHash) {
+				result.errors.push('API Hash is required for requestQr operation');
+				result.isValid = false;
+			}
+			break;
+
+		case 'completeQr':
+			if (!params.apiId) {
+				result.errors.push('API ID is required for completeQr operation');
+				result.isValid = false;
+			}
+			if (!params.apiHash) {
+				result.errors.push('API Hash is required for completeQr operation');
+				result.isValid = false;
+			}
+			if (!params.preAuthSession) {
+				result.errors.push('Pre-auth session is required for completeQr operation');
+				result.isValid = false;
+			}
+			break;
+
 		case 'signIn':
 			if (!params.apiId) {
 				result.errors.push('API ID is required for signIn operation');

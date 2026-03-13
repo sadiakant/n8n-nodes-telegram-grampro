@@ -1,4 +1,4 @@
-![Telegram GramPro Banner](https://raw.githubusercontent.com/sadiakant/n8n-nodes-telegram-grampro/refs/heads/main/docs/n8n-nodes-telegram-grampro.png)
+![Telegram GramPro Banner](https://raw.githubusercontent.com/sadiakant/n8n-nodes-telegram-grampro/refs/heads/main/docs/assets/n8n-nodes-telegram-grampro.png)
 
 # Telegram GramPro - n8n Integration
 
@@ -144,7 +144,7 @@ For detailed documentation of all operations with parameters, examples, and use 
 
 | Resource              | Operations                                                                                                  |
 | --------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **Session Generator** | Request Code, Sign In & Generate                                                                            |
+| **Session Generator** | Request Login Code, Resend Login Code, Complete Login, Request QR Login, Complete QR Login                  |
 | **Message**           | Send Text, Get Messages, Edit, Delete, Pin, Forward, Copy, Edit Media, Create Poll, Copy Restricted Content |
 | **Chat**              | Get Chat, Get Dialogs, Join Channel/Group, Leave Channel/Group, Create Group/Channel                        |
 | **User**              | Get User Info, Get Full User Details, Update Profile, Change Username, Get Profile Photo                    |

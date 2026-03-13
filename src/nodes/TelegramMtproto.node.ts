@@ -281,12 +281,27 @@ export class TelegramMtproto implements INodeType {
 					{
 						name: 'Request Login Code',
 						value: 'requestCode',
-						action: 'Request Login Code',
+						action: 'Phone Login: Request Code',
+					},
+					{
+						name: 'Resend Login Code',
+						value: 'resendCode',
+						action: 'Phone Login: Resend Code',
 					},
 					{
 						name: 'Complete Login',
 						value: 'signIn',
-						action: 'Complete Login',
+						action: 'Phone Login: Sign In',
+					},
+					{
+						name: 'Request QR Login',
+						value: 'requestQr',
+						action: 'QR Login: Generate Code',
+					},
+					{
+						name: 'Complete QR Login',
+						value: 'completeQr',
+						action: 'QR Login: Authenticate',
 					},
 				],
 				default: 'requestCode',
@@ -328,6 +343,7 @@ export class TelegramMtproto implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['authentication'],
+						operation: ['requestCode', 'signIn', 'resendCode'],
 					},
 				},
 				description: 'Phone number in international format (e.g., +1234567890)',
@@ -353,7 +369,7 @@ export class TelegramMtproto implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['authentication'],
-						operation: ['requestCode', 'signIn'],
+						operation: ['requestCode', 'signIn', 'completeQr'],
 					},
 				},
 				description: 'Optional 2FA password if your account has 2FA enabled',
@@ -366,7 +382,7 @@ export class TelegramMtproto implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['authentication'],
-						operation: ['signIn'],
+						operation: ['signIn', 'resendCode'],
 					},
 				},
 				description: 'The phone code hash from the Request Code operation',
@@ -379,7 +395,7 @@ export class TelegramMtproto implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['authentication'],
-						operation: ['signIn'],
+						operation: ['signIn', 'resendCode', 'completeQr'],
 					},
 				},
 				description: 'The temporary session string returned by the Request Code operation',
