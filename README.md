@@ -1,4 +1,4 @@
-![Telegram GramPro Banner](https://raw.githubusercontent.com/sadiakant/n8n-nodes-telegram-grampro/refs/heads/main/docs/assets/n8n-nodes-telegram-grampro.png)
+![Telegram GramPro Banner](docs/assets/n8n-nodes-telegram-grampro.webp)
 
 # Telegram GramPro - n8n Integration
 
@@ -7,7 +7,7 @@
 <h4 align="center"> Join Our Telegram Group for Help and Support</h4>
 <p align="center"> 
   <a href="https://t.me/n8n_nodes_0">
-    <img src="./docs/assets/n8n_nodes_0.png" alt="n8n_nodes_0" width="220" />
+    <img src="./docs/assets/n8n_nodes_0.webp" alt="n8n_nodes_0" width="220" />
   </a>
 </p>
 
@@ -117,12 +117,12 @@ For detailed documentation of all operations with parameters, examples, and use 
 
 | Resource              | Operations                                                                                                  |
 | --------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **Session Generator** | Request Login Code, Resend Login Code, Complete Login, Request QR Login, Complete QR Login                  |
-| **Message**           | Send Text, Get Messages, Edit, Delete, Pin, Forward, Copy, Edit Media, Create Poll, Copy Restricted Content |
-| **Chat**              | Get Chat, Get Dialogs, Join Channel/Group, Leave Channel/Group, Create Group/Channel                        |
-| **User**              | Get User Info, Get Full User Details, Update Profile, Change Username, Get Profile Photo                    |
+| **Auth**              | Request Login Code, Resend Login Code, Sign in, Request QR Login, Complete QR Login                         |
+| **Message**           | Send Message, Get Chat History, Edit, Delete, Pin, Forward, Copy, Edit Media, Create Poll, Copy Restricted Content, Clear History, Unpin Message |
+| **Chat**              | Get Chat Info, Get Chats List, Join Channel/Group, Leave Channel/Group, Create Group/Channel                |
+| **User**              | Get My Profile, Get Profiles Photo, Update My Profile, Update My Username, Get User Profile (Bio & Common Chats) |
 | **Media**             | Download Media Files                                                                                        |
-| **Channel**           | Get Admin & Bots, Get Public Members, Add/Remove Member, Ban/Unban User, Promote to Admin                   |
+| **Channel**           | Add Member, Remove Member, Ban User, Unban User, Promote to Admin, Get Members                              |
 
 ## 🛡️ Security Features
 
@@ -218,90 +218,51 @@ For comprehensive troubleshooting guidance, common issues, and solutions, see ou
 
 ```
 n8n-nodes-telegram-grampro/
-│   .editorconfig
-│   .gitignore
-│   .n8nignore
-│   .prettierrc.js
-│   eslint.config.mjs
-│   gulpfile.js
-│   LICENSE
-│   package.json
-│   pnpm-lock.yaml
-│   pnpm-workspace.yaml
-│   README.md
-│   tsconfig.json
+├── 📄 Root Files
+│   ├── .gitignore, .prettierrc.js, eslint.config.mjs
+│   ├── LICENSE, README.md
+│   ├── package.json, package-lock.json
+│   └── tsconfig.json
 │
-├───.github
-│   │   CODE_OF_CONDUCT.md
-│   │   CONTRIBUTING.md
-│   │   SECURITY.md
-│   │
-│   └───workflows
-│           build.yml
-│           publish.yml
+├── 🐙 .github/
+│   ├── CODE_OF_CONDUCT.md, CONTRIBUTING.md, SECURITY.md
+│   └── workflows/
+│       ├── build.yml
+│       └── publish.yml
 │
-├───.vscode
-│       settings.json
+├── 🛠️ .vscode/
+│   └── settings.json
 │
-├───docs
-│   │   AUTHORIZATION_GUIDE.md
-│   │   OPERATIONS_GUIDE.md
-│   │   TROUBLESHOOTING_GUIDE.md
-│   │
-│   ├───assets
-│   │   │   n8n-nodes-telegram-grampro.png
-│   │   │   n8n_nodes_0.png
-│   │   │
-│   │   ├───phone-login
-│   │   │       phone_workflow_overview.jpg
-│   │   │       step1_request_code.jpg
-│   │   │       step2_resend_code.jpg
-│   │   │       step3_sign_in.jpg
-│   │   │
-│   │   └───qr-login
-│   │           step1_tele_settings.jpg
-│   │           step2_tele_link_device.jpg
-│   │           step3_n8n_workflow.jpg
-│   │           step4_n8n_qr_output.jpg
-│   │           step5_n8n_session_output.jpg
-│   │
-│   └───Workflows-Examples
-│           Send messages from folder chats to user.json
-│           Send messages from one user to multiple users.json
+├── 🔐 credentials/
+│   ├── TelegramGramProApi.credentials.ts
+│   └── telegram-grampro-credentials.svg
 │
-└───src
-    │   index.ts
+├── 📚 docs/
+│   ├── AUTHORIZATION_GUIDE.md
+│   ├── OPERATIONS_GUIDE.md
+│   └── TROUBLESHOOTING_GUIDE.md
+│
+└── ⚡ nodes/
+    ├── 📦 TelegramGramPro/
+    │   ├── TelegramGramPro.node.ts
+    │   ├── telegram-grampro.svg
+    │   ├── core/
+    │   │   ├── cache.ts, clientManager.ts, floodWaitHandler.ts
+    │   │   ├── logger.ts, operationHelpers.ts, qrPng.ts
+    │   │   ├── rateLimiter.ts, sessionEncryption.ts
+    │   │   ├── telegramErrorMapper.ts, validation.ts
+    │   │   └── types.ts
+    │   └── resources/
+    │       ├── authentication.operations.ts
+    │       ├── channel.operations.ts
+    │       ├── chat.operations.ts
+    │       ├── media.operations.ts
+    │       ├── message.operations.ts
+    │       └── user.operations.ts
     │
-    ├───core
-    │       cache.ts
-    │       clientManager.ts
-    │       floodWaitHandler.ts
-    │       logger.ts
-    │       operationHelpers.ts
-    │       rateLimiter.ts
-    │       sessionEncryption.ts
-    │       telegramErrorMapper.ts
-    │       validation.ts
-    │
-    ├───credentials
-    │       telegram-grampro-credentials.svg
-    │       TelegramApi.credentials.ts
-    │
-    ├───nodes
-    │   │   telegram-grampro.svg
-    │   │   TelegramMtproto.node.ts
-    │   │   TelegramTrigger.node.ts
-    │   │
-    │   └───resources
-    │           authentication.operations.ts
-    │           channel.operations.ts
-    │           chat.operations.ts
-    │           media.operations.ts
-    │           message.operations.ts
-    │           user.operations.ts
-    │
-    └───types
-            telegram.ts
+    └── 🔔 TelegramGramProTrigger/
+        ├── TelegramGramProTrigger.node.ts
+        └── telegram-grampro.svg
 ```
 
 ## Workflow Examples

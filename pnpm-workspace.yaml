@@ -1,6 +1,0 @@
-allowBuilds:
-  bufferutil: true
-  es5-ext: true
-  eslint-plugin-n8n-nodes-base: true
-  isolated-vm: true
-  utf-8-validate: true

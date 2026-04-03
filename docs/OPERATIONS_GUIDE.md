@@ -8,7 +8,7 @@ This guide provides comprehensive documentation for all operations available in 
 
 ### **Message Operations**
 
-#### **Send Text**
+#### **Send Message**
 Send text messages to any chat or user with advanced options including binary file upload and media URL support.
 
 **Parameters:**
@@ -49,7 +49,7 @@ Send text messages to any chat or user with advanced options including binary fi
 
 ---
 
-#### **Get Messages**
+#### **Get Chat History**
 Retrieve messages from a chat with optional time and media filters, enhanced with advanced filtering options.
 
 **Parameters:**
@@ -388,9 +388,34 @@ Handle media that cannot be forwarded normally with download-and-upload fallback
 
 ---
 
+#### **Clear History**
+Clear message history from a chat with specialized options for deleting for everyone.
+
+**Parameters:**
+- **Chat ID**: Target chat ID, username (@channel), or invite link
+- **Max Message ID**: Maximum ID of message to delete (0 to delete all)
+- **Delete for Everyone**: Whether to delete message(s) for everyone
+
+**Example:**
+```json
+{
+  "operation": "deleteHistory",
+  "chatId": "123456789",
+  "maxId": 0,
+  "revoke": true
+}
+```
+
+**Use Cases:**
+- Complete chat cleanup
+- Privacy management
+- Resetting automation targets
+
+---
+
 ### **Chat Operations**
 
-#### **Get Chat**
+#### **Get Chat Info**
 Retrieve detailed chat information with enhanced metadata.
 
 **Parameters:**
@@ -416,7 +441,7 @@ Retrieve detailed chat information with enhanced metadata.
 
 ---
 
-#### **Get Dialogs**
+#### **Get Chats List**
 Get list of user's chats with pagination and enhanced filtering.
 
 **Parameters:**
@@ -500,7 +525,7 @@ Create new chats or groups with custom settings and enhanced validation.
 
 ### **User Operations**
 
-#### **Get Full User Info**
+#### **Get User Profile**
 Get detailed user information including bio and common chats with enhanced privacy handling.
 
 **Parameters:**
@@ -528,7 +553,7 @@ Get detailed user information including bio and common chats with enhanced priva
 
 ---
 
-#### **Update Profile**
+#### **Update My Profile**
 Update your Telegram profile information including name and bio with enhanced validation.
 
 **Parameters:**
@@ -558,7 +583,7 @@ Update your Telegram profile information including name and bio with enhanced va
 
 ---
 
-#### **Update Username**
+#### **Update My Username**
 Change your Telegram username with enhanced validation and availability checking.
 
 **Parameters:**
@@ -867,7 +892,7 @@ Download media files from messages with progress tracking and enhanced error han
 
 ### **Authentication Operations**
 
-#### **Request Login Code**
+#### **B1: Phone Login - Request Code**
 Request a verification code to be sent to your phone number with enhanced security.
 
 **Parameters:**
@@ -899,7 +924,7 @@ Request a verification code to be sent to your phone number with enhanced securi
 
 ---
 
-#### **Resend Login Code**
+#### **B2: Phone Login - Resend Code**
 Resend the login code using the next available delivery method.
 
 **Parameters:**
@@ -914,7 +939,7 @@ Resend the login code using the next available delivery method.
 
 ---
 
-#### **Request QR Login**
+#### **A1: QR Login - Generate Code**
 Generate a QR login token and URL to scan in Telegram.
 
 **Parameters:**
@@ -929,7 +954,7 @@ Generate a QR login token and URL to scan in Telegram.
 
 ---
 
-#### **Complete QR Login**
+#### **A2: QR Login - Authenticate**
 Finalize QR login after scanning the QR in Telegram.
 
 **Parameters:**
@@ -941,7 +966,7 @@ Finalize QR login after scanning the QR in Telegram.
 
 ---
 
-#### **Complete Login**
+#### **B3: Phone Login - Sign in**
 Complete the authentication process and generate a session string with enhanced encryption.
 
 **Parameters:**
@@ -981,12 +1006,12 @@ Complete the authentication process and generate a session string with enhanced 
 
 | Resource | Operations | Description |
 |----------|------------|-------------|
-| **Session Generator** | Request Login Code, Resend Login Code, Request QR Login, Complete QR Login, Complete Login | Account authentication and setup with enhanced security |
-| **Message** | Send Text, Get Messages, Edit, Delete, Pin, Forward, Copy, Edit Media, Unpin, Create Poll, Copy Restricted Content | Complete message management with advanced features |
-| **Chat** | Get Chat, Get Dialogs, Join Channel/Group, Leave Channel/Group, Create Group/Channel | Chat and group operations with enhanced validation |
-| **User** | Get User Info, Get Full User Details, Update Profile, Change Username, Get Profile Photo | User information and management with privacy respect |
+| **Auth** | B1-B3 Phone Login, A1-A2 QR Login | Account authentication and setup with enhanced security |
+| **Message** | Send Message, Get Chat History, Edit, Delete, Pin, Forward, Copy, Edit Media, Unpin, Create Poll, Copy Restricted Content, Clear History | Complete message management with advanced features |
+| **Chat** | Get Chat Info, Get Chats List, Join Channel/Group, Leave Channel/Group, Create Group/Channel | Chat and group operations with enhanced validation |
+| **User** | Get My Profile, Get Profiles Photo, Update My Profile, Update My Username, Get User Profile | User information and management with privacy respect |
 | **Media** | Download Media Files | Media file handling with progress tracking |
-| **Channel** | Get Admin & Bots, Get Public Members, Add/Remove Member, Ban/Unban User, Promote to Admin | Channel and group administration with granular permissions |
+| **Channel** | Add Member, Remove Member, Ban User, Unban User, Promote to Admin, Get Members | Channel and group administration with granular permissions |
 
 ## Workflow Integration Examples
 

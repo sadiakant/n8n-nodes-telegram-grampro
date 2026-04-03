@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-telegram-grampro",
-	"version": "5.0.1",
+	"version": "5.0.2",
 	"description": "Telegram GramPro is Advanced n8n node for Telegram MTProto automation using GramJS, featuring user account triggers and 2FA support.",
 	"license": "MIT",
 	"keywords": [
@@ -25,18 +25,17 @@
 		"auto-responder",
 		"scraper"
 	],
-	"packageManager": "pnpm@10.32.1",
-	"main": "dist/index.js",
-	"types": "dist/index.d.ts",
 	"scripts": {
-		"build": "rimraf dist && tsc && gulp build:icons",
-		"test": "pnpm run lint && pnpm run build",
-		"format": "prettier src/core src/credentials src/nodes src/nodes/resources src/types src/index.ts --write",
-		"dev": "tsc --watch",
-		"lint": "eslint src/core src/credentials src/nodes src/nodes/resources src/types src/index.ts",
-		"lint:fix": "eslint src/core src/credentials src/nodes src/nodes/resources src/types src/index.ts --fix",
-		"n8n-scan": "pnpm dlx @n8n/scan-community-package .",
-		"prepublishOnly": "pnpm run lint && pnpm run build"
+		"build": "n8n-node build",
+		"build:watch": "tsc --watch",
+		"dev": "n8n-node dev",
+		"format": "prettier credentials nodes/TelegramGramPro nodes/TelegramGramProTrigger --write",
+		"lint": "n8n-node lint",
+		"lint:fix": "n8n-node lint --fix",
+		"n8n-scan": "npx @n8n/scan-community-package .",
+		"test": "n8n-node lint && n8n-node build",
+		"release": "n8n-node release",
+		"prepublishOnly": "n8n-node prerelease"
 	},
 	"author": {
 		"name": "sadiakant",
@@ -51,32 +50,23 @@
 		"url": "https://github.com/sadiakant/n8n-nodes-telegram-grampro/issues"
 	},
 	"dependencies": {
-		"qrcode": "^1.5.4",
 		"telegram": "^2.26.22"
 	},
 	"devDependencies": {
-		"@eslint/js": "^10.0.1",
-		"@types/crypto-js": "^4.2.2",
-		"@types/node": "^25.5.0",
-		"@types/qrcode": "^1.5.6",
-		"@typescript-eslint/parser": "8.57.0",
-		"eslint": "^10.0.3",
-		"eslint-plugin-n8n-nodes-base": "^1.16.6",
-		"globals": "^17.4.0",
-		"gulp": "^5.0.1",
-		"n8n-workflow": "2.10.0",
-		"prettier": "^3.8.1",
-		"rimraf": "^6.1.3",
-		"typescript": "^5.9.3",
-		"typescript-eslint": "^8.57.0"
+		"@n8n/node-cli": "*",
+		"eslint": "9.39.4",
+		"prettier": "3.8.1",
+		"release-it": "19.2.4",
+		"typescript": "5.9.3"
 	},
 	"peerDependencies": {
-		"n8n-workflow": "^1.120.0 || ^2.0.0"
+		"n8n-workflow": "*"
 	},
 	"n8n": {
+		"n8nNodesApiVersion": 1,
 		"nodes": [
-			"dist/nodes/TelegramMtproto.node.js",
-			"dist/nodes/TelegramTrigger.node.js"
+			"dist/nodes/TelegramGramPro/TelegramGramPro.node.js",
+			"dist/nodes/TelegramGramProTrigger/TelegramGramProTrigger.node.js"
 		],
 		"credentials": [
 			"dist/credentials/TelegramGramProApi.credentials.js"

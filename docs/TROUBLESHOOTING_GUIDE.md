@@ -27,7 +27,7 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 2. **Check API Credentials**
    - Verify API ID and API Hash from [my.telegram.org](https://my.telegram.org)
    - Ensure no extra spaces or characters
-   - Test credentials with a simple Request Login Code operation
+   - Test credentials with a simple B1: Phone Login - Request Code operation
 
 3. **Network Troubleshooting**
    ```bash
@@ -58,7 +58,7 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 
 **Solutions:**
 1. **Verify Phone Code Hash**
-   - Ensure you're using the correct phoneCodeHash from Request Login Code
+   - Ensure you're using the correct phoneCodeHash from B1: Phone Login - Request Code
    - Don't reuse old phoneCodeHash values
    - Use drag-and-drop to avoid manual copying errors
 
@@ -69,7 +69,7 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 
 3. **Complete Authentication Quickly**
    - Verification codes expire in 10-15 minutes
-   - Complete both Request Login Code and Complete Login operations back-to-back
+   - Complete both B1: Phone Login - Request Code and B3: Phone Login - Sign in operations back-to-back
    - Request new code if previous one expired
 
 4. **Network Stability**
@@ -100,13 +100,10 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
    - Ensure no extra spaces or characters
    - Copy code directly from SMS
 
-2. **Check Code Expiration**
-   - Telegram codes typically expire in 10-15 minutes
-   - Request a new code if expired
-   - Complete authentication quickly
+2. **"Phone code expired"**: The verification code has expired (typically after 10-15 minutes). Request a new code using B1: Phone Login - Request Code and try again.
 
 3. **Verify phoneCodeHash**
-   - Ensure you're using the correct phoneCodeHash from Request Login Code
+   - Ensure you're using the correct phoneCodeHash from B1: Phone Login - Request Code
    - Don't reuse old phoneCodeHash values
    - Use drag-and-drop to avoid manual copying errors
 
@@ -170,7 +167,7 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 1. **Verify API Credentials**
    - Ensure API ID and Hash are correct and properly formatted
    - Check for extra spaces or special characters
-   - Test credentials with Request Login Code operation
+   - Test credentials with B1: Phone Login - Request Code operation
 
 2. **Check System Resources**
    - Monitor memory usage during authentication
@@ -670,7 +667,7 @@ Validate session string:
    - Format: "123456:abcdef..."
 
 2. **Test Session**
-   - Create simple workflow with Get Me operation
+   - Create simple workflow with User > Get My Profile operation
    - Verify session works with basic operations
    - Monitor for session-related errors
 

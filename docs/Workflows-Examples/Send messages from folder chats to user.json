@@ -50,7 +50,7 @@
 				"onlyMedia": true,
 				"mediaType": ["photo"]
 			},
-			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
 			"position": [-208, 960],
 			"id": "node-get-history",
@@ -71,7 +71,7 @@
 				"targetChatId": "Target_Bot_Username",
 				"messageId": "={{ $json.message_id }}"
 			},
-			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
 			"position": [224, 656],
 			"id": "node-send-messages",
@@ -99,7 +99,7 @@
 				"chatId": "your_admin_user",
 				"text": "=Hello {{ $input.all().length }} Message sent.\n\nDate: {{ $now.setZone('Asia/Kolkata').format('dd-MMM-yyyy') }}\nTime: {{ $now.setZone('Asia/Kolkata').format('hh:mm a') }}\n- Workflow Completed"
 			},
-			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
 			"position": [448, 464],
 			"id": "node-notify-success",
@@ -150,7 +150,7 @@
 				"chatId": "your_admin_user",
 				"text": "=Error in {{ $workflow.name }}.\n- Failed Node: Send Messages\n- Error: {{ $json.error }}"
 			},
-			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
 			"position": [448, 928],
 			"id": "node-error-1",
@@ -167,7 +167,7 @@
 				"chatId": "your_admin_user",
 				"text": "=Error in {{ $workflow.name }}.\n- Failed Node: GetHistory\n- Error: {{ $json.error }}"
 			},
-			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
 			"position": [16, 1136],
 			"id": "node-error-2",
@@ -222,7 +222,7 @@
 				"operation": "getDialogs",
 				"groupByFolders": true
 			},
-			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
 			"position": [-1120, 848],
 			"id": "node-get-chats",

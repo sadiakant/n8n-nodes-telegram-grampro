@@ -28,12 +28,12 @@ The Phone Login method uses a One-Time Password (OTP) sent to your Telegram app 
 For a complete setup, we recommend connecting the nodes as shown above. This allows you to easily pass the `phoneCodeHash` and `preAuthSession` between steps.
 
 
-### Step 1: Phone Login: Request Login Code
+### Step 1: B1: Phone Login - Request Code
 
 ![Resend Code Setup](assets/phone-login/step2_resend_code.jpg)
 
 1.  Add a **Telegram Auth** node.
-2.  Set Operation to **Phone Login: Request Login Code**.
+2.  Set Operation to **B1: Phone Login - Request Code**.
 3.  Enter your **API ID**, **API Hash**, and **Phone Number** (international format).
 4.  (Optional) Enter your **2FA Password** if enabled.
 5.  **Execute the node**.
@@ -41,25 +41,25 @@ For a complete setup, we recommend connecting the nodes as shown above. This all
 > [!NOTE]
 > Telegram will prioritize sending the code to your active Telegram app. If you don't have the app open, check your SMS.
 
-### Step 2: Resend Login Code (Optional)
+### Step 2: B2: Phone Login - Resend Code (Optional)
 
 ![Phone Login Workflow Overview](assets/phone-login/phone_workflow_overview.jpg)
 
 If you haven't received the code within 60 seconds, or if you need the code via SMS instead of the app, you can use the **Resend Login Code** operation.
 
 1.  Add another **Telegram Auth** node.
-2.  Set Operation to **Phone Login: Resend Login Code**.
-3.  Link the output from "Request Login Code" to this node to automatically pass the **API ID**, **API Hash**, **Phone Number**, and **Phone Code Hash**.
+2.  Set Operation to **B2: Phone Login - Resend Code**.
+3.  Link the output from "B1: Phone Login - Request Code" to this node to automatically pass the **API ID**, **API Hash**, **Phone Number**, and **Phone Code Hash**.
 4.  **Execute the node** to trigger a new delivery method.
 
-### Step 3: Phone Login: Complete Login
+### Step 3: B3: Phone Login - Sign in
 
 ![Complete Login Setup & Result](assets/phone-login/step3_sign_in.jpg)
 
 Once you have the 5-digit verification code:
 
 1.  Add a **Telegram Auth** node.
-2.  Set Operation to **Phone Login: Complete Login**.
+2.  Set Operation to **B3: Phone Login - Sign in**.
 3.  Link the previous node's output to automatically populate the required hashes.
 4.  Enter the **Verification Code** you received.
 5.  **Execute the node**.
@@ -95,10 +95,10 @@ Create a simple workflow with two Telegram Auth nodes:
 
 ![n8n Workflow Overview](assets/qr-login/step3_n8n_workflow.jpg)
 
-### Step 1: Request QR Login
+### Step 1: A1: QR Login - Generate Code
 
 1.  Add a **Telegram Auth** node to n8n.
-2.  Set Resource to **Authentication** and Operation to **Request QR Login**.
+2.  Set Resource to **Authentication** and Operation to **A1: QR Login - Generate Code**.
 3.  Enter your **API ID** and **API Hash**. 
 4.  **Execute the node**.
 
@@ -111,10 +111,10 @@ You will see a QR code generated in the **Binary** output tab:
 > [!TIP]
 > The QR code expires quickly (usually 30-60 seconds). Scan it as soon as it appears.
 
-### Step 2: Complete QR Login
+### Step 2: A2: QR Login - Authenticate
 
 1.  Add another **Telegram Auth** node.
-2.  Set Operation to **Complete QR Login**.
+2.  Set Operation to **A2: QR Login - Authenticate**.
 3.  Fill in the parameters (API ID, API Hash).
 4.  **Pre-Auth Session String**: Pass the `preAuthSession` value from the output of Step 1.
 5.  **2FA Password**: If you have Two-Step Verification enabled, enter your password here.
@@ -141,7 +141,7 @@ The session string is encrypted automatically when used with the main Telegram n
 ## Phone Code Expiration - Quick Fix Guide
 
 ### Problem
-The error `PHONE_CODE_EXPIRED` occurs when the verification code sent to your phone has expired before you complete the Complete Login operation.
+The error `PHONE_CODE_EXPIRED` occurs when the verification code sent to your phone has expired before you complete the B3: Phone Login - Sign in operation.
 
 ### Why This Happens
 - Telegram verification codes typically expire after **10-15 minutes**
@@ -151,8 +151,8 @@ The error `PHONE_CODE_EXPIRED` occurs when the verification code sent to your ph
 ### Solution
 
 #### Immediate Fix
-1. **Request a new code** using the Request Login Code operation
-2. **Complete the Complete Login operation immediately** (within 10 minutes)
+1. **Request a new code** using the B1: Phone Login - Request Code operation
+2. **Complete the B3: Phone Login - Sign in operation immediately** (within 10 minutes)
 3. **Use the new phoneCodeHash** from the fresh request
 
 #### Best Practices to Avoid This Issue
@@ -163,7 +163,7 @@ The error `PHONE_CODE_EXPIRED` occurs when the verification code sent to your ph
 
 **Workflow Optimization**:
 ```
-Request Login Code → Store phoneCodeHash → Get Phone Code from SMS → Complete Login → Use Session String
+B1: Phone Login - Request Code → Store phoneCodeHash → Get Phone Code from SMS → B3: Phone Login - Sign in → Use Session String
 ```
 
 **Error Handling**:
@@ -174,7 +174,7 @@ The updated node provides clear error messages:
 
 ### Step-by-Step Recovery
 
-1. **Run Request Login Code Operation**
+1. **Run B1: Phone Login - Request Code Operation**
    ```json
    {
      "operation": "requestCode",
@@ -192,7 +192,7 @@ The updated node provides clear error messages:
    }
    ```
 
-3. **Immediately Run Complete Login Operation**
+3. **Immediately Run B3: Phone Login - Sign in Operation**
    ```json
    {
      "operation": "signIn",
@@ -407,7 +407,7 @@ This guide provides a complete authentication solution for integrating Telegram 
 - n8n global credentials UI may still display the generic success text Connection tested successfully even after real verification.
 
 ### Common Mapped Credential Errors
-- AUTH_KEY_UNREGISTERED: Session invalid/expired. Re-run Auth > Complete Login.
+- AUTH_KEY_UNREGISTERED: Session invalid/expired. Re-run Auth > B3: Phone Login - Sign in or A2: QR Login - Authenticate.
 - SESSION_REVOKED / SESSION_EXPIRED: Session revoked or expired. Re-authenticate.
 - SESSION_PASSWORD_NEEDED: Account has 2FA enabled; provide password.
 - FLOOD_WAIT_X: Wait for Telegram rate-limit window before retrying.

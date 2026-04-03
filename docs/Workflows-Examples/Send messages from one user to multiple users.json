@@ -46,7 +46,7 @@
 				"chatId": "Source_Username",
 				"mode": "hours"
 			},
-			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
 			"position": [-1072, 768],
 			"id": "node-tg-get",
@@ -66,7 +66,7 @@
 				"messageId": "={{ $json.message_id }}",
 				"caption": "=Message ID: #ID{{ $json.message_id }}\n{{ $json.text }}"
 			},
-			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
 			"position": [-176, 800],
 			"id": "node-tg-copy",
@@ -84,7 +84,7 @@
 				"chatId": "your_admin_user",
 				"text": "=Hello {{ $input.all().length }} Message published.\n- {{ $workflow.name }} Completed"
 			},
-			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
 			"position": [-176, 576],
 			"id": "node-tg-notify",
@@ -112,7 +112,7 @@
 				"operation": "deleteHistory",
 				"chatId": "Source_Username"
 			},
-			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
 			"position": [48, 576],
 			"id": "node-tg-clear",
@@ -142,7 +142,7 @@
 				"chatId": "your_admin_user",
 				"text": "=Error in {{ $workflow.name }}.\n- Failed Node: Send Messages\n- Error: {{ $json.error }} "
 			},
-			"type": "n8n-nodes-telegram-grampro.telegramMtproto",
+			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
 			"position": [48, 992],
 			"id": "node-tg-error",
