@@ -21,27 +21,16 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org/
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Cache pnpm store
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
+          cache: npm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
 
       - name: Build project
-        run: pnpm build
+        run: npm run build
 
       - name: Runtime versions
         run: |
@@ -49,15 +38,10 @@ jobs:
           npm --version
 
       - name: Smart Publish Logic
-        env:
-          NODE_AUTH_TOKEN: ''
-          NPM_TOKEN: ''
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           LOCAL_VERSION=$(node -p "require('./package.json').version")
-
-          # Handle first-time publish scenarios
-          REMOTE_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+          REMOTE_VERSION=$(npm view "$PACKAGE_NAME" version 2>/dev/null || echo "0.0.0")
 
           echo "Checking Versions..."
           echo "Local  : $LOCAL_VERSION"
@@ -76,22 +60,18 @@ jobs:
 
           echo "Status : $STATUS"
 
-          if [ "$STATUS" == "GREATER" ]; then
+          if [ "$STATUS" = "GREATER" ]; then
             echo "New version detected. Publishing $LOCAL_VERSION to @latest..."
-            npm config delete //registry.npmjs.org/:_authToken || true
             npm publish --provenance --access public --ignore-scripts
             echo "Published $LOCAL_VERSION to @latest"
-
-          elif [ "$STATUS" == "EQUAL" ]; then
+          elif [ "$STATUS" = "EQUAL" ]; then
             echo "Same version. Publishing to @dev tag..."
-            TIMESTAMP=$(date +%d%b%Y.%I%M%p)
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
             DEV_VERSION="${LOCAL_VERSION}-dev.${TIMESTAMP}"
 
-            npm version $DEV_VERSION --no-git-tag-version --ignore-scripts
-            npm config delete //registry.npmjs.org/:_authToken || true
+            npm version "$DEV_VERSION" --no-git-tag-version --ignore-scripts
             npm publish --tag dev --provenance --access public --ignore-scripts
             echo "Published $DEV_VERSION to @dev"
-
           else
             echo "ERROR: Local ($LOCAL_VERSION) < Remote ($REMOTE_VERSION). Update package.json version."
             exit 1

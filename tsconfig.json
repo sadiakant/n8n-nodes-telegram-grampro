@@ -4,7 +4,11 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "target": "es2019",
-    "lib": ["es2019", "es2020", "es2022.error"],
+    "lib": [
+      "es2019",
+      "es2020",
+      "es2022.error"
+    ],
     "removeComments": true,
     "useUnknownInCatchVariables": false,
     "forceConsistentCasingInFileNames": true,
@@ -15,14 +19,16 @@
     "preserveConstEnums": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
+    "incremental": true,
     "declaration": true,
     "sourceMap": true,
     "skipLibCheck": true,
-    "rootDir": "./src",
-    "outDir": "./dist/",
-    "types": ["node"],
-    "typeRoots": ["./node_modules/@types"]
+    "outDir": "./dist/"
   },
-  "exclude": ["node_modules", "dist"],
-  "include": ["src/**/*.ts"]
+  "include": [
+    "credentials/**/*",
+    "nodes/**/*",
+    "nodes/**/*.json",
+    "package.json"
+  ]
 }
