@@ -14,6 +14,14 @@ import { mediaRouter } from './resources/media.operations';
 import { channelRouter } from './resources/channel.operations';
 import { authenticationRouter } from './resources/authentication.operations';
 
+const messageTypeOptions = [
+	{ name: 'Text', value: 'text' },
+	{ name: 'Photo', value: 'photo' },
+	{ name: 'Video', value: 'video' },
+	{ name: 'Document', value: 'document' },
+	{ name: 'Other', value: 'other' },
+];
+
 export class TelegramGramPro implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Telegram GramPro',
@@ -551,18 +559,14 @@ export class TelegramGramPro implements INodeType {
 						operation: ['sendText'],
 					},
 				},
-				description: 'Whether to upload a photo, video, or document with the message',
+				description: 'Whether to upload a photo, video, document, or other file with the message',
 			},
 			{
 				displayName: 'Media Type',
 				name: 'mediaType',
 				type: 'options',
 				default: 'document',
-				options: [
-					{ name: 'Photo', value: 'photo' },
-					{ name: 'Video', value: 'video' },
-					{ name: 'Document', value: 'document' },
-				],
+				options: messageTypeOptions,
 				displayOptions: {
 					show: {
 						resource: ['message'],
@@ -570,7 +574,8 @@ export class TelegramGramPro implements INodeType {
 						attachMedia: [true],
 					},
 				},
-				description: 'Select the kind of media you are attaching',
+				description:
+					'Select the message type. Choose Text to send the message without attaching media.',
 			},
 			{
 				displayName: 'Binary Property',
@@ -742,17 +747,13 @@ export class TelegramGramPro implements INodeType {
 					},
 				},
 				description:
-					'Whether to only return messages that contain media (photos, videos, documents)',
+					'Whether to filter by media or message type. Leave Media Type empty to only return messages that contain media.',
 			},
 			{
 				displayName: 'Media Type',
 				name: 'mediaType',
 				type: 'multiOptions',
-				options: [
-					{ name: 'Photo', value: 'photo' },
-					{ name: 'Video', value: 'video' },
-					{ name: 'Document', value: 'document' },
-				],
+				options: messageTypeOptions,
 				default: [],
 				displayOptions: {
 					show: {
@@ -761,7 +762,7 @@ export class TelegramGramPro implements INodeType {
 						onlyMedia: [true],
 					},
 				},
-				description: 'Filter by specific media types. Leave empty to allow all media.',
+				description: 'Filter by specific message or media types. Leave empty to allow all media.',
 			},
 
 			{

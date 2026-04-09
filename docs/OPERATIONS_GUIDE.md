@@ -21,10 +21,13 @@ Supported updates:
 
 ### Trigger Filters
 
-- **Message Direction**: Capture `Incoming Only`, `Outgoing Only`, or `Both`.
-- **Restrict to Chat Types**: Limit events to `Private`, `Group`, and/or `Channel`.
-- **Restrict to Chat IDs/Usernames**: Match chat IDs, usernames, or titles.
-- **Restrict to User IDs/Usernames**: Match sender IDs, usernames, or names.
+- **Listening Mode**: Capture `Incoming Messages`, `Outgoing Messages`, or both.
+- **All Messages**: Catch all supported updates unless a more specific include filter is enabled.
+- **Only User Messages**: Limit events to private user or bot chats.
+- **Only Channel Messages**: Limit events to channels.
+- **Only Group Messages**: Limit events to groups and supergroups.
+- **Selected Chats Only**: Match only selected chats/senders from a JSON array or comma-separated list.
+- **Except Selected Chats Only**: Exclude selected chats/senders after the main include filter is applied.
 
 ### Identifier Matching
 
@@ -34,6 +37,7 @@ Supported updates:
   - chat username/title
   - sender username/display name
 - Numeric IDs are matched across equivalent forms such as `519...`, `-519...`, and `-100519...`.
+- Exclusion matching uses the same identifier rules as inclusion matching.
 
 ### Trigger Output (Readable)
 
@@ -75,10 +79,14 @@ Send text messages to any chat or user with advanced options including binary fi
 - **Reply To**: Optional message ID to reply to
 - **Disable Link Preview**: Hide link previews for URLs
 - **Send to Saved Messages**: Send to your Saved Messages (me) instead of a specific chat
-- **Attach Media**: Upload a photo, video, or document with the message
-- **Media Type**: Select the kind of media (Photo, Video, Document)
+- **Attach Media**: Upload a file with the message when the selected media type is not `text`
+- **Media Type**: Select `Text`, `Photo`, `Video`, `Document`, or `Other`
 - **Binary Property**: Name of the binary property containing the file to upload
 - **Media URL**: Optional direct URL to a file (fallback if no binary data)
+
+**Behavior Notes:**
+- If `Attach Media` is enabled but `Media Type` resolves to `text`, the node sends a plain text message and does not require binary input.
+- This is useful when `mediaType` is mapped directly from trigger output such as `={{ $json.messageType }}`.
 
 **Example:**
 ```json
@@ -100,10 +108,11 @@ Send text messages to any chat or user with advanced options including binary fi
 - Notifications with images
 
 **New Features:**
-- **Binary File Upload**: Support for photos, videos, documents with automatic format detection
+- **Binary File Upload**: Support for `photo`, `video`, `document`, and `other` file uploads where applicable
 - **Media URL Support**: Direct URL upload with fallback to download-and-upload
 - **Progress Tracking**: Real-time download progress for large media files
 - **Format Detection**: Automatic media type detection from MIME types
+- **Text-safe Media Mapping**: `mediaType = text` falls back to plain text sending instead of throwing a binary-data error
 
 ---
 
@@ -118,8 +127,8 @@ Retrieve messages from a chat with optional time and media filters, enhanced wit
 - **From Date**: Start date/time (Mode = Date Range)
 - **To Date**: End date/time (Mode = Date Range)
 - **Max Messages**: Safety cap for very active chats (Mode = Last X Hours / Date Range)
-- **Has Media**: Only return messages that contain media
-- **Media Type**: Filter by Photo, Video, or Document
+- **Has Media**: Enable message/media-type filtering
+- **Media Type**: Filter by `Text`, `Photo`, `Video`, `Document`, or `Other`
 - **Get from Saved Messages**: Fetch history from your Saved Messages (me)
 
 **Example:**
@@ -131,18 +140,18 @@ Retrieve messages from a chat with optional time and media filters, enhanced wit
   "hours": 6,
   "maxMessages": 500,
   "onlyMedia": true,
-  "mediaType": ["photo", "video"]
+  "mediaType": ["text", "photo", "video"]
 }
 ```
 
 **Use Cases:**
-- Fetch recent messages with media filtering
+- Fetch recent messages with message/media-type filtering
 - Time-based monitoring and analysis
 - Media-only scanning for content moderation
 - Audit windows for compliance
 
 **Enhanced Features:**
-- **Advanced Filtering**: Filter by specific media types (Photo, Video, Document)
+- **Advanced Filtering**: Filter by specific trigger-compatible message/media types (`text`, `photo`, `video`, `document`, `other`)
 - **Time Range Support**: Flexible date range and hour-based filtering
 - **Safety Caps**: Maximum message limits to prevent overwhelming responses
 - **Rich Metadata**: Enhanced message information including sender details and timestamps

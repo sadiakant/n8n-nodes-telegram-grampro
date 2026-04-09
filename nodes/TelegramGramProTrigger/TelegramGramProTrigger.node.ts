@@ -13,7 +13,7 @@ import type { EditedMessageEvent } from 'telegram/events/EditedMessage';
 import type { NewMessageEvent } from 'telegram/events/NewMessage';
 
 import { testTelegramApi } from '../../credentials/TelegramGramProApi.credentials';
-import { getClient } from '../TelegramGramPro/core/clientManager';
+import { disconnectClient, getClient } from '../TelegramGramPro/core/clientManager';
 import { logger } from '../TelegramGramPro/core/logger';
 import type { TelegramCredentials } from '../TelegramGramPro/core/types';
 import {
@@ -87,8 +87,7 @@ export class TelegramGramProTrigger implements INodeType {
 					{
 						name: 'Message',
 						value: 'message',
-						description:
-							'Trigger on new messages from private chats, groups, channels, or bots',
+						description: 'Trigger on new messages from private chats, groups, channels, or bots',
 					},
 					{
 						name: 'Edited Message',
@@ -98,80 +97,123 @@ export class TelegramGramProTrigger implements INodeType {
 				],
 			},
 			{
-				displayName: 'Additional Fields',
-				name: 'additionalFields',
-				type: 'collection',
-				placeholder: 'Add Field',
-				default: {},
+				displayName: 'Listening Mode',
+				name: 'listeningMode',
+				type: 'multiOptions',
+				required: true,
+				default: ['incoming', 'outgoing'],
 				options: [
 					{
-						displayName: 'Download Images/Files',
-						name: 'download',
-						type: 'boolean',
-						default: false,
-						description:
-							'Whether to attach media for photos, videos, and documents in binary.data',
+						name: 'Incoming Messages',
+						value: 'incoming',
+						description: 'Listen only for incoming messages',
 					},
 					{
-						displayName: 'Message Direction',
-						name: 'messageDirection',
-						type: 'options',
-						default: 'incoming',
-						options: [
-							{
-								name: 'Incoming Only',
-								value: 'incoming',
-							},
-							{
-								name: 'Outgoing Only',
-								value: 'outgoing',
-							},
-							{
-								name: 'Both',
-								value: 'both',
-							},
-						],
-						description:
-							'User accounts receive both incoming and outgoing updates, so choose which direction should trigger the workflow',
-					},
-					{
-						displayName: 'Restrict to Chat IDs/Usernames',
-						name: 'chatIds',
-						type: 'string',
-						default: '',
-						description:
-							'Comma-separated chat IDs, @usernames, or titles to match. Numeric aliases such as 123, -123, and -100123 are matched automatically.',
-					},
-					{
-						displayName: 'Restrict to Chat Types',
-						name: 'chatTypes',
-						type: 'multiOptions',
-						default: ['private', 'group', 'channel'],
-						options: [
-							{
-								name: 'Private',
-								value: 'private',
-							},
-							{
-								name: 'Group',
-								value: 'group',
-							},
-							{
-								name: 'Channel',
-								value: 'channel',
-							},
-						],
-						description: 'Which chat sources are allowed to emit events',
-					},
-					{
-						displayName: 'Restrict to User IDs/Usernames',
-						name: 'userIds',
-						type: 'string',
-						default: '',
-						description:
-							'Comma-separated sender IDs, @usernames, or names to match. Numeric aliases such as 123, -123, and -100123 are matched automatically.',
+						name: 'Outgoing Messages',
+						value: 'outgoing',
+						description: 'Listen only for outgoing messages',
 					},
 				],
+			},
+			{
+				displayName: 'All Messages',
+				name: 'allMessages',
+				type: 'boolean',
+				default: true,
+				displayOptions: {
+					show: {
+						onlyUserMessages: [false],
+						onlyChannelMessages: [false],
+						onlyGroupMessages: [false],
+						selectedChatsOnly: [false],
+					},
+				},
+				description: 'Whether to capture all messages from users, groups, channels, and bots',
+			},
+			{
+				displayName: 'Only User Messages',
+				name: 'onlyUserMessages',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					hide: {
+						selectedChatsOnly: [true],
+					},
+				},
+				description: 'Whether to capture only private user or bot messages',
+			},
+			{
+				displayName: 'Only Channel Messages',
+				name: 'onlyChannelMessages',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					hide: {
+						selectedChatsOnly: [true],
+					},
+				},
+				description: 'Whether to capture only channel messages or posts',
+			},
+			{
+				displayName: 'Only Group Messages',
+				name: 'onlyGroupMessages',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					hide: {
+						selectedChatsOnly: [true],
+					},
+				},
+				description: 'Whether to capture only group and supergroup messages',
+			},
+			{
+				displayName: 'Selected Chats Only',
+				name: 'selectedChatsOnly',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					hide: {
+						onlyUserMessages: [true],
+						onlyChannelMessages: [true],
+						onlyGroupMessages: [true],
+					},
+				},
+				description:
+					'Whether to capture messages only when the chat or sender matches your selected list (this disables All Messages)',
+			},
+			{
+				displayName: 'Except Selected Chats Only',
+				name: 'exceptSelectedChatsOnly',
+				type: 'boolean',
+				default: false,
+				description:
+					'Whether to ignore messages when the chat or sender matches your excluded list',
+			},
+			{
+				displayName: 'Selected Chats',
+				name: 'selectedChats',
+				type: 'string',
+				default: '[]',
+				displayOptions: {
+					show: {
+						selectedChatsOnly: [true],
+					},
+				},
+				description:
+					'JSON array of chat IDs, usernames, or names to match. Example: ["group1","user1","@username","-100123456789","1122334455"].',
+			},
+			{
+				displayName: 'Except Selected Chats',
+				name: 'exceptSelectedChats',
+				type: 'string',
+				default: '[]',
+				displayOptions: {
+					show: {
+						exceptSelectedChatsOnly: [true],
+					},
+				},
+				description:
+					'JSON array of chat IDs, usernames, or names to ignore. Example: ["username1","channel1","channel2","group1"].',
 			},
 		],
 		usableAsTool: true,
@@ -223,8 +265,10 @@ export class TelegramGramProTrigger implements INodeType {
 		logger.info('[TelegramGramProTrigger] Trigger activated', {
 			nodeName: this.getNode().name,
 			updates: config.updates.join(','),
-			messageDirection: config.messageDirection,
-			chatTypes: config.chatTypes.join(','),
+			listeningMode: config.listeningMode.join(','),
+			allMessages: config.allMessages,
+			exceptSelectedChatsOnly: config.exceptSelectedChatsOnly,
+			selectedChatsOnly: config.selectedChatsOnly,
 		});
 
 		return {
@@ -242,7 +286,11 @@ export class TelegramGramProTrigger implements INodeType {
 
 				if (client.listEventHandlers().length === 0) {
 					try {
-						await client.disconnect();
+						const apiId =
+							typeof credentials.apiId === 'string'
+								? Number.parseInt(credentials.apiId, 10)
+								: credentials.apiId;
+						await disconnectClient(apiId, credentials.session);
 					} catch (error) {
 						logger.warn('[TelegramGramProTrigger] Failed to disconnect update client', {
 							error: getErrorMessage(error),
@@ -287,7 +335,7 @@ function createRegistration(
 			}
 
 			const payload = buildTriggerPayload(currentUpdateType, message, messageContext);
-			const item = await createExecutionItem(context, message, payload, config);
+			const item = await createExecutionItem(context, message, payload);
 			await emit([item]);
 		} catch (error) {
 			logger.error('[TelegramGramProTrigger] Failed to process Telegram update', {

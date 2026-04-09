@@ -6,9 +6,9 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 
 ## Trigger Filter Troubleshooting
 
-### Restrict to Chat IDs or User IDs matches only one source
+### Selected or excluded chat list matches only one source
 
-If your comma-separated restriction fields appear to match only one item, verify the values and ID formats:
+If your `Selected Chats` or `Except Selected Chats` field appears to match only one item, verify the values and ID formats:
 
 - Separate multiple entries with commas, for example:
 
@@ -21,22 +21,31 @@ If your comma-separated restriction fields appear to match only one item, verify
   - `-519...`
   - `-100519...`
 - Username values can be used with or without `@`
-- `Restrict to Chat IDs/Usernames` checks chat identifiers
-- `Restrict to User IDs/Usernames` checks sender identifiers
+- Matching checks both chat identifiers and sender identifiers
+- JSON arrays such as `["username1","-100123456789","8569392472"]` are recommended, but comma-separated input also works
 
 If no items match, the trigger emits no events.
 
 ### Trigger does not fire for my own sent messages
 
-Check `Message Direction`. Telegram user accounts receive both incoming and outgoing updates, but the trigger defaults to `Incoming Only` to avoid feedback loops.
+Check `Listening Mode`. Telegram user accounts receive both incoming and outgoing updates, but the trigger only listens to the directions you selected.
 
 ### Trigger does not fire for channel or group messages
 
 Check these points:
 
-- `Restrict to Chat Types` must include `Channel` and/or `Group`
+- `All Messages` must be enabled, or the matching include filter must be enabled (`Only Channel Messages`, `Only Group Messages`, or `Selected Chats Only`)
 - Your `Trigger On` selection must include the relevant update type
-- Your chat/user restriction fields must match the actual channel or sender identifiers
+- Your selected/excluded chat lists must match the actual channel or sender identifiers
+
+### Except Selected Chats is not excluding a sender or chat
+
+Check these points:
+
+- `Except Selected Chats Only` must be enabled
+- The value can be a JSON array, a single number/string, or a comma-separated list
+- Numeric ID aliases are matched automatically, so `123`, `-123`, and `-100123` can all resolve to the same Telegram entity
+- Trigger output `chatId` and `senderId` can be used directly for reliable exclusion matching
 
 ## 🚨 Common Issues & Solutions
 
@@ -291,13 +300,12 @@ Check these points:
 ---
 
 #### **"Ghost Connection timeout" Error**
-**Problem**: Persistent connection timeout errors in n8n logs.
+**Problem**: Persistent connection timeout errors in n8n logs after authentication changes, workflow unpublish, or session switching.
 
 **Solutions:**
 1. **Restart n8n**
-   - Always restart n8n after session string generation
-   - This clears any cached connection issues
-   - Required step in the authentication process
+   - Restart after session generation or after replacing credentials used by active workflows
+   - This clears cached MTProto clients that may still hold the previous session state
 
 2. **Session String Handling**
    - Copy session string to text file for backup
@@ -305,9 +313,9 @@ Check these points:
    - Verify session string format
 
 3. **Connection Cleanup**
-   - The node automatically cleans up connections
+   - The trigger now automatically cleans up update listeners on workflow unpublish/deactivation
    - Monitor logs for connection status
-   - Check for memory leaks in long-running workflows
+   - If timeouts appear only while the workflow is active, verify network reachability to Telegram instead of trigger logic first
 
 ---
 

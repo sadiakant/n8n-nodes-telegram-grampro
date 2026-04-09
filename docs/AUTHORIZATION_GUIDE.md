@@ -136,7 +136,7 @@ If successful, you will receive your **Session String**:
 2. **Save it to a text file** for backup purposes
 3. **Restart your n8n instance** to prevent "Ghost Connection timeout" errors in the terminal logs
 
-The session string is encrypted automatically when used with the main Telegram nodes, but restarting n8n ensures clean session management.
+The session string is encrypted automatically when used with the main Telegram nodes. Restarting n8n after generating or replacing a session keeps trigger/action nodes on a clean shared MTProto client state.
 
 ## Phone Code Expiration - Quick Fix Guide
 
@@ -281,7 +281,9 @@ If connection pooling fails:
 The generated `sessionString` can be used directly with:
 
 - **Telegram MTProto Node**: For all Telegram operations
-- **Telegram Trigger Node**: For event-based workflows
+- **Telegram Trigger Node**: For event-based workflows with MTProto listening
+
+The trigger and action nodes now reuse the same cached Telegram client for the same account session. This reduces duplicate-session instability when a published workflow receives a trigger event and then sends or edits a message in the same execution.
 
 ## Security Features
 
@@ -412,5 +414,4 @@ This guide provides a complete authentication solution for integrating Telegram 
 - SESSION_PASSWORD_NEEDED: Account has 2FA enabled; provide password.
 - FLOOD_WAIT_X: Wait for Telegram rate-limit window before retrying.
 - NETWORK_TIMEOUT / ETIMEDOUT: Temporary network issue; retry.
-
 

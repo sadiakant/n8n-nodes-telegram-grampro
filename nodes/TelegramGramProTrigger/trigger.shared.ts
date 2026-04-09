@@ -12,22 +12,23 @@ import type { TelegramTriggerPayload } from '../TelegramGramPro/core/types';
 type ParameterContext = Pick<ITriggerFunctions, 'getNode' | 'getNodeParameter' | 'helpers'>;
 
 export type SupportedUpdate = 'message' | 'edited_message';
-
-type SupportedDirection = 'incoming' | 'outgoing' | 'both';
-type SupportedChatType = 'private' | 'group' | 'channel';
+export type ListeningMode = 'incoming' | 'outgoing';
 
 const ALL_UPDATES: SupportedUpdate[] = ['message', 'edited_message'];
-const ALL_CHAT_TYPES: SupportedChatType[] = ['private', 'group', 'channel'];
-const DEFAULT_MESSAGE_DIRECTION: SupportedDirection = 'incoming';
+const ALL_LISTENING_MODES: ListeningMode[] = ['incoming', 'outgoing'];
 const DEDUPE_TTL_MS = 10 * 60 * 1000;
 
 export interface TriggerConfig {
 	updates: SupportedUpdate[];
-	downloadMedia: boolean;
-	messageDirection: SupportedDirection;
-	chatTypes: SupportedChatType[];
-	chatIds: string[];
-	userIds: string[];
+	listeningMode: ListeningMode[];
+	allMessages: boolean;
+	onlyUserMessages: boolean;
+	onlyChannelMessages: boolean;
+	onlyGroupMessages: boolean;
+	exceptSelectedChatsOnly: boolean;
+	exceptSelectedChats: string[];
+	selectedChatsOnly: boolean;
+	selectedChats: string[];
 }
 
 export interface MessageContext {
@@ -41,18 +42,43 @@ export interface MessageContext {
 
 export function parseTriggerConfig(context: ParameterContext): TriggerConfig {
 	const updates = normalizeUpdates(context.getNodeParameter('updates', ['message']));
-	const additionalFields = normalizeDataObject(
-		context.getNodeParameter('additionalFields', {}),
-		context.getNode().name,
+	const listeningMode = normalizeListeningModes(
+		context.getNodeParameter('listeningMode', ['incoming', 'outgoing']),
 	);
+	const exceptSelectedChatsOnly = Boolean(
+		context.getNodeParameter('exceptSelectedChatsOnly', false),
+	);
+	const rawExceptSelectedChats = context.getNodeParameter('exceptSelectedChats', '[]');
+	const rawSelectedChatsOnly = Boolean(context.getNodeParameter('selectedChatsOnly', false));
+	const rawOnlyUserMessages = Boolean(context.getNodeParameter('onlyUserMessages', false));
+	const rawOnlyChannelMessages = Boolean(context.getNodeParameter('onlyChannelMessages', false));
+	const rawOnlyGroupMessages = Boolean(context.getNodeParameter('onlyGroupMessages', false));
+	const rawAllMessages = Boolean(context.getNodeParameter('allMessages', true));
+	const rawSelectedChats = context.getNodeParameter('selectedChats', '[]');
+	const hasOnlyMessageFilters =
+		rawOnlyUserMessages || rawOnlyChannelMessages || rawOnlyGroupMessages;
+	const selectedChatsOnly = hasOnlyMessageFilters ? false : rawSelectedChatsOnly;
+	const onlyUserMessages = selectedChatsOnly ? false : rawOnlyUserMessages;
+	const onlyChannelMessages = selectedChatsOnly ? false : rawOnlyChannelMessages;
+	const onlyGroupMessages = selectedChatsOnly ? false : rawOnlyGroupMessages;
+	const hasSpecificInclusionFilter =
+		onlyUserMessages || onlyChannelMessages || onlyGroupMessages || selectedChatsOnly;
 
 	return {
 		updates,
-		downloadMedia: Boolean(additionalFields.download),
-		messageDirection: normalizeDirection(additionalFields.messageDirection),
-		chatTypes: normalizeChatTypes(additionalFields.chatTypes),
-		chatIds: parseCommaSeparatedValues(additionalFields.chatIds),
-		userIds: parseCommaSeparatedValues(additionalFields.userIds),
+		listeningMode,
+		allMessages: hasSpecificInclusionFilter ? false : rawAllMessages,
+		onlyUserMessages,
+		onlyChannelMessages,
+		onlyGroupMessages,
+		exceptSelectedChatsOnly,
+		exceptSelectedChats: exceptSelectedChatsOnly
+			? parseChatList(context, rawExceptSelectedChats, 'Except Selected Chats')
+			: [],
+		selectedChatsOnly,
+		selectedChats: selectedChatsOnly
+			? parseChatList(context, rawSelectedChats, 'Selected Chats')
+			: [],
 	};
 }
 
@@ -80,31 +106,32 @@ export function shouldProcessMessage(
 	messageContext: MessageContext,
 	config: TriggerConfig,
 ): boolean {
-	if (!matchesDirection(message, config.messageDirection)) {
+	if (!matchesListeningMode(message, config.listeningMode)) {
 		return false;
 	}
 
-	if (!matchesChatType(message, config.chatTypes)) {
+	const matchesAllMessages = config.allMessages;
+	const matchesUser = config.onlyUserMessages && Boolean(message.isPrivate);
+	const matchesChannel = config.onlyChannelMessages && Boolean(message.isChannel);
+	const matchesGroup = config.onlyGroupMessages && Boolean(message.isGroup);
+	const matchesSelectedChats =
+		config.selectedChatsOnly &&
+		config.selectedChats.length > 0 &&
+		matchesSelectedChat(messageContext, config.selectedChats);
+
+	const shouldInclude =
+		matchesAllMessages || matchesUser || matchesChannel || matchesGroup || matchesSelectedChats;
+
+	if (!shouldInclude) {
 		return false;
 	}
 
-	if (!matchesConfiguredValues(config.chatIds, [
-		messageContext.chatId,
-		messageContext.chatUsername,
-		messageContext.chatName,
-	])) {
-		return false;
-	}
+	const matchesExceptSelectedChats =
+		config.exceptSelectedChatsOnly &&
+		config.exceptSelectedChats.length > 0 &&
+		matchesSelectedChat(messageContext, config.exceptSelectedChats);
 
-	if (!matchesConfiguredValues(config.userIds, [
-		messageContext.senderId,
-		messageContext.senderUsername,
-		messageContext.senderName,
-	])) {
-		return false;
-	}
-
-	return true;
+	return !matchesExceptSelectedChats;
 }
 
 export function buildTriggerPayload(
@@ -136,13 +163,12 @@ export async function createExecutionItem(
 	context: ITriggerFunctions,
 	message: Api.Message,
 	payload: TelegramTriggerPayload,
-	config: TriggerConfig,
 ): Promise<INodeExecutionData> {
 	const item: INodeExecutionData = {
 		json: payload as unknown as IDataObject,
 	};
 
-	if (!config.downloadMedia || !shouldAttachBinary(payload.messageType)) {
+	if (!shouldAttachBinary(payload.messageType)) {
 		return item;
 	}
 
@@ -196,108 +222,117 @@ function normalizeUpdates(value: NodeParameterValueType | object): SupportedUpda
 		return ['message'];
 	}
 
-	const parsed = value.filter((entry): entry is SupportedUpdate =>
-		typeof entry === 'string' && ALL_UPDATES.includes(entry as SupportedUpdate),
+	const parsed = value.filter(
+		(entry): entry is SupportedUpdate =>
+			typeof entry === 'string' && ALL_UPDATES.includes(entry as SupportedUpdate),
 	);
 
 	return parsed.length > 0 ? parsed : ['message'];
 }
 
-function normalizeDirection(value: unknown): SupportedDirection {
-	return value === 'incoming' || value === 'outgoing' || value === 'both'
-		? value
-		: DEFAULT_MESSAGE_DIRECTION;
-}
-
-function normalizeChatTypes(value: unknown): SupportedChatType[] {
-	if (!Array.isArray(value) || value.length === 0) {
-		return ALL_CHAT_TYPES;
+function normalizeListeningModes(value: NodeParameterValueType | object): ListeningMode[] {
+	if (!Array.isArray(value)) {
+		return [...ALL_LISTENING_MODES];
 	}
 
 	const parsed = value.filter(
-		(entry): entry is SupportedChatType =>
-			typeof entry === 'string' && ALL_CHAT_TYPES.includes(entry as SupportedChatType),
+		(entry): entry is ListeningMode =>
+			typeof entry === 'string' && ALL_LISTENING_MODES.includes(entry as ListeningMode),
 	);
 
-	return parsed.length > 0 ? parsed : ALL_CHAT_TYPES;
+	return parsed.length > 0 ? parsed : [...ALL_LISTENING_MODES];
 }
 
-function normalizeDataObject(value: NodeParameterValueType | object, nodeName: string): IDataObject {
-	if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-		throw new Error(`Node "${nodeName}" returned invalid additional fields configuration.`);
-	}
-
-	return value as IDataObject;
+function matchesListeningMode(message: Api.Message, listeningMode: ListeningMode[]): boolean {
+	const direction: ListeningMode = message.out ? 'outgoing' : 'incoming';
+	return listeningMode.includes(direction);
 }
 
-function parseCommaSeparatedValues(value: unknown): string[] {
-	if (typeof value !== 'string') {
-		return [];
+function parseChatList(
+	context: ParameterContext,
+	rawChatList: NodeParameterValueType | object,
+	fieldLabel: string,
+): string[] {
+	if (typeof rawChatList !== 'string') {
+		throw new Error(`Node "${context.getNode().name}" returned invalid ${fieldLabel} value.`);
 	}
 
-	return value
-		.split(',')
-		.map((entry) => normalizeMatchValue(entry))
-		.filter((entry): entry is string => entry !== null);
+	try {
+		const parsed = JSON.parse(rawChatList);
+		if (typeof parsed === 'string' || typeof parsed === 'number' || typeof parsed === 'bigint') {
+			return normalizeChatEntries([parsed]);
+		}
+
+		if (!Array.isArray(parsed)) {
+			throw new Error(`${fieldLabel} must be a JSON array, string, or number.`);
+		}
+
+		return normalizeChatEntries(parsed);
+	} catch (error) {
+		const fallbackValues = rawChatList
+			.split(',')
+			.map((entry) => entry.trim())
+			.filter((entry) => entry.length > 0);
+
+		if (fallbackValues.length > 0) {
+			return normalizeChatEntries(fallbackValues);
+		}
+
+		throw new Error(
+			`${fieldLabel} must be a valid JSON array, single value, or comma-separated list. Example: ["group1","@username","-100123456789","1122334455"] or 8569392472. ${getErrorMessage(error)}`,
+		);
+	}
 }
 
-function matchesDirection(message: Api.Message, direction: SupportedDirection): boolean {
-	if (direction === 'both') {
-		return true;
-	}
+function normalizeChatEntries(values: unknown[]): string[] {
+	const expanded = new Set<string>();
 
-	return direction === 'outgoing' ? Boolean(message.out) : !message.out;
-}
-
-function matchesChatType(message: Api.Message, chatTypes: SupportedChatType[]): boolean {
-	if (message.isPrivate) {
-		return chatTypes.includes('private');
-	}
-
-	if (message.isGroup) {
-		return chatTypes.includes('group');
-	}
-
-	if (message.isChannel) {
-		return chatTypes.includes('channel');
-	}
-
-	return false;
-}
-
-function matchesConfiguredValues(configuredValues: string[], candidates: Array<string | null>): boolean {
-	if (configuredValues.length === 0) {
-		return true;
-	}
-
-	const normalizedCandidates = new Set<string>();
-	for (const candidate of candidates) {
-		const normalized = normalizeMatchValue(candidate);
+	for (const value of values) {
+		const normalized = normalizeMatchValue(value);
 		if (!normalized) {
 			continue;
 		}
 
-		normalizedCandidates.add(normalized);
 		for (const alias of expandIdAliases(normalized)) {
-			normalizedCandidates.add(alias);
+			expanded.add(alias);
 		}
 	}
 
-	return configuredValues.some((configuredValue) => {
-		if (normalizedCandidates.has(configuredValue)) {
-			return true;
+	return Array.from(expanded);
+}
+
+function matchesSelectedChat(messageContext: MessageContext, selectedChats: string[]): boolean {
+	const candidates = new Set<string>();
+
+	for (const value of [
+		messageContext.chatId,
+		messageContext.senderId,
+		messageContext.chatName,
+		messageContext.chatUsername,
+		messageContext.senderName,
+		messageContext.senderUsername,
+	]) {
+		const normalized = normalizeMatchValue(value);
+		if (!normalized) {
+			continue;
 		}
 
-		return expandIdAliases(configuredValue).some((alias) => normalizedCandidates.has(alias));
-	});
+		candidates.add(normalized);
+		for (const alias of expandIdAliases(normalized)) {
+			candidates.add(alias);
+		}
+	}
+
+	return selectedChats.some((entry) => candidates.has(entry));
 }
 
 function normalizeMatchValue(value: unknown): string | null {
-	if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'bigint') {
+	const rawValue = stringifyMatchValue(value);
+	if (rawValue === null) {
 		return null;
 	}
 
-	const normalized = String(value).trim().toLowerCase();
+	const normalized = rawValue.trim().toLowerCase();
 	if (!normalized) {
 		return null;
 	}
@@ -369,8 +404,19 @@ function fallbackSenderName(message: Api.Message, chatEntity: unknown): string |
 }
 
 function normalizeString(value: unknown): string | null {
+	return stringifyMatchValue(value);
+}
+
+function stringifyMatchValue(value: unknown): string | null {
 	if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint') {
 		return String(value);
+	}
+
+	if (typeof value === 'object' && value !== null && 'toString' in value) {
+		const stringValue = value.toString();
+		if (typeof stringValue === 'string' && stringValue !== '[object Object]') {
+			return stringValue;
+		}
 	}
 
 	return null;
@@ -414,7 +460,7 @@ async function downloadBinaryData(
 
 	const document = message.document;
 	const mimeType =
-		messageType === 'photo' ? 'image/jpeg' : document?.mimeType ?? 'application/octet-stream';
+		messageType === 'photo' ? 'image/jpeg' : (document?.mimeType ?? 'application/octet-stream');
 	const fileName =
 		getDocumentFileName(document) ?? inferFileName(messageType, message.id, mimeType);
 
@@ -459,11 +505,7 @@ async function toBuffer(value: unknown): Promise<Buffer | null> {
 		});
 	}
 
-	if (
-		typeof value === 'object' &&
-		'getReader' in value &&
-		typeof value.getReader === 'function'
-	) {
+	if (typeof value === 'object' && 'getReader' in value && typeof value.getReader === 'function') {
 		const reader = value.getReader() as {
 			read: () => Promise<{ done: boolean; value?: Uint8Array }>;
 		};

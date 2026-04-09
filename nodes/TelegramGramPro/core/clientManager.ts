@@ -44,6 +44,14 @@ function cleanupStaleConnections(): void {
 	}
 }
 
+function buildClientKey(apiId: number, session: string): string {
+	return `${apiId}:${session.length > 20 ? session.substring(0, 20) : session}:${session.slice(-10)}`;
+}
+
+function isDestroyedClient(client: TelegramClient): boolean {
+	return Boolean((client as TelegramClient & { _destroyed?: boolean })._destroyed);
+}
+
 export async function getClient(
 	apiId: number | string,
 	apiHash: string,
@@ -55,10 +63,7 @@ export async function getClient(
 	const cacheClient = options.cacheClient ?? true;
 	const verifyAuthorization = options.verifyAuthorization ?? true;
 	const autoReconnect = options.autoReconnect ?? true;
-	// Use a more robust key generation to prevent collisions
-	const key = `${numericApiId}:${receiveUpdates ? 'updates' : 'snapshot'}:${
-		session.length > 20 ? session.substring(0, 20) : session
-	}:${session.slice(-10)}`;
+	const key = buildClientKey(numericApiId, session);
 
 	// 1. If this client is currently connecting, wait for that specific promise
 	const existingLock = cacheClient ? connectionLocks.get(key) : undefined;
@@ -71,22 +76,27 @@ export async function getClient(
 	if (cacheClient && clients.has(key)) {
 		const existingClient = clients.get(key)!;
 
-		// Quick Health Check
-		if (existingClient.connected) {
-			return existingClient;
-		}
-
-		// If not connected, try to reconnect gracefully
-		logger.warn(
-			`[ClientManager] Client ${numericApiId} found but disconnected. Attempting heal...`,
-		);
-		try {
-			await existingClient.connect();
-			return existingClient;
-		} catch {
-			logger.error(`[ClientManager] Heal failed for ${numericApiId}. Destroying and recreating.`);
-			await gracefulDestroy(existingClient);
+		if (isDestroyedClient(existingClient)) {
+			logger.warn(`[ClientManager] Client ${numericApiId} is destroyed. Recreating cached client.`);
 			clients.delete(key);
+		} else {
+			// Quick Health Check
+			if (existingClient.connected) {
+				return existingClient;
+			}
+
+			// If not connected, try to reconnect gracefully
+			logger.warn(
+				`[ClientManager] Client ${numericApiId} found but disconnected. Attempting heal...`,
+			);
+			try {
+				await existingClient.connect();
+				return existingClient;
+			} catch {
+				logger.error(`[ClientManager] Heal failed for ${numericApiId}. Destroying and recreating.`);
+				await gracefulDestroy(existingClient);
+				clients.delete(key);
+			}
 		}
 	}
 
@@ -174,7 +184,7 @@ async function gracefulDestroy(client: TelegramClient) {
  * Gracefully disconnect and clean up a client
  */
 export async function disconnectClient(apiId: number, session: string): Promise<void> {
-	const key = `${apiId}:${session.slice(0, 10)}`;
+	const key = buildClientKey(apiId, session);
 	if (clients.has(key)) {
 		const client = clients.get(key)!;
 		await gracefulDestroy(client);

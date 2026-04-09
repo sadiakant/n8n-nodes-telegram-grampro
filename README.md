@@ -61,11 +61,11 @@ Telegram GramPro is a comprehensive n8n custom node that brings the full power o
 1. **Clone to n8n custom nodes directory**
 2. **Install dependencies**
    ```bash
-   pnpm install
+   npm install
    ```
 3. **Build the project**
    ```bash
-   pnpm run build
+   npm run build
    ```
 4. **Restart n8n** to load the custom node
 
@@ -78,11 +78,11 @@ Telegram GramPro is a comprehensive n8n custom node that brings the full power o
 2. **Move to n8n custom nodes directory**
 3. **Install dependencies**
    ```bash
-   pnpm install
+   npm install
    ```
 4. **Build the project**
    ```bash
-   pnpm run build
+   npm run build
    ```
 5. **Restart n8n** to load the custom node
 
@@ -113,6 +113,21 @@ In n8n → Settings → Credentials:
 
 For detailed documentation of all operations with parameters, examples, and use cases, see our [Operations Guide](./docs/OPERATIONS_GUIDE.md).
 
+## Latest Release Highlights
+
+This release finalizes the GramPro user-account trigger and aligns media handling across the node.
+
+- New `Telegram GramPro Trigger` for Telegram user accounts using a persistent MTProto listener
+- Published workflow support for `Message` and `Edited Message` trigger events
+- `Listening Mode` multi-select with `Incoming Messages` and `Outgoing Messages`
+- Trigger filters: `All Messages`, `Only User Messages`, `Only Channel Messages`, `Only Group Messages`, `Selected Chats Only`, `Except Selected Chats Only`
+- Selected/excluded chat matching by username, title, sender name, sender ID, chat ID, and equivalent numeric aliases
+- Auto binary download in trigger output for `photo`, `video`, and `document`
+- Improved trigger cleanup and shared client reuse to prevent stale MTProto timeout logs
+- `Media Type` support aligned to `text`, `photo`, `video`, `document`, `other`
+- `Send Message` now treats `mediaType = text` as plain text without requiring binary data
+- `Get Chat History` can filter by the same trigger-compatible message/media types
+
 ## 🔧 Available Operations
 
 | Resource              | Operations                                                                                                  |
@@ -137,12 +152,25 @@ Supported updates:
 - `Message`
 - `Edited Message`
 
-User-account specific filters:
-- `Message Direction`: `Incoming Only`, `Outgoing Only`, `Both`
-- `Restrict to Chat Types`: `Private`, `Group`, `Channel`
-- `Restrict to Chat IDs/Usernames`
-- `Restrict to User IDs/Usernames`
+Listening mode:
+- `Incoming Messages`
+- `Outgoing Messages`
+- Selecting both listens to both directions
+
+Trigger filters:
+- `All Messages`
+- `Only User Messages`
+- `Only Channel Messages`
+- `Only Group Messages`
+- `Selected Chats Only`
+- `Except Selected Chats Only`
+
+Filter behavior:
+- `All Messages` is the default catch-all mode
+- `Selected Chats Only` matches chat or sender identifiers from a JSON array or comma-separated list
+- `Except Selected Chats Only` excludes matching chats or senders after the main include filter is applied
 - Numeric IDs are matched across equivalent forms such as `519...`, `-519...`, and `-100519...`
+- `Selected Chats Only` and the per-type include toggles are mutually exclusive in the UI to avoid hidden-value overwrite issues
 
 Trigger output is readable-only (`raw` removed) and includes:
 - `updateType`, `message`, `date` (ISO UTC), `editDate`, `chatName`, `chatId`, `senderName`, `senderId`, `messageId`
@@ -233,7 +261,7 @@ In-memory caching for frequently accessed data:
 
 ### **Enhanced Request Handling**
 
-- **Binary File Upload**: Support for photos, videos, documents with automatic format detection
+- **Binary File Upload**: Support for text-aware send flows plus photos, videos, documents, and other file types where applicable
 - **Media URL Support**: Direct URL upload with fallback to download-and-upload
 - **Progress Tracking**: Real-time download progress for large media files
 - **Error Recovery**: Automatic retry for network timeouts and connection issues
@@ -257,9 +285,6 @@ n8n-nodes-telegram-grampro/
 │   └── workflows/
 │       ├── build.yml
 │       └── publish.yml
-│
-├── 🛠️ .vscode/
-│   └── settings.json
 │
 ├── 🔐 credentials/
 │   ├── TelegramGramProApi.credentials.ts
@@ -291,10 +316,6 @@ n8n-nodes-telegram-grampro/
     └── 🔔 TelegramGramProTrigger/
         ├── TelegramGramProTrigger.node.ts
         ├── trigger.shared.ts
-        ├── Modes/
-        │   ├── Manual/manual.mode.ts
-        │   ├── Schedule/schedule.mode.ts
-        │   └── Webhook/webhook.mode.ts
         └── telegram-grampro.svg
 ```
 
@@ -360,13 +381,13 @@ We welcome contributions to make Telegram GramPro even better!
 git clone https://github.com/sadiakant/n8n-nodes-telegram-grampro.git
 
 # Install dependencies
-pnpm install
+npm install
 
 # Start development mode
-pnpm run dev
+npm run dev
 
 # Build for production
-pnpm run build
+npm run build
 ```
 
 ### **Code Standards**
@@ -391,31 +412,26 @@ MIT License - see LICENSE file for details.
 
 ## 👥 Contributors
 
-### **Core Development Team**
+<div align="center">
 
-| Contributor                                                                                                                                                                                           | Role                         | Expertise & Contributions                                                                                                                                                                                                                                                                  |
-| :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <a href="https://github.com/sadiakant"><img src="https://github.com/sadiakant.png" width="50" height="50" style="border-radius:50%; border: 2px solid #007bff;" alt="Sadiakant"></a><br>**Sadiakant** | **Project Lead & Developer** | <span style="color: #28a745; font-weight: bold;">🔧</span> **Architecture & Development**<br>• Overall project architecture and design<br>• Core node implementation and authentication system<br>• TypeScript development and API integration<br>• Production deployment and optimization |
-| <a href="https://deepseek.com"><img src="https://github.com/deepseek-ai.png" width="50" height="50" style="border-radius:50%; border: 2px solid #6f42c1;" alt="DeepSeek AI"></a><br>**DeepSeek AI**   | **Concept & Ideas**          | <span style="color: #6f42c1; font-weight: bold;">💡</span> **Innovation & Strategy**<br>• Initial project structure and feature suggestions<br>• Technical concept development<br>• Architecture planning and design patterns<br>• Feature roadmap and enhancement ideas                   |
-| <a href="https://openai.com"><img src="https://github.com/openai.png" width="50" height="50" style="border-radius:50%; border: 2px solid #007bff;" alt="ChatGPT AI"></a><br>**ChatGPT AI**            | **Implementation Strategy**  | <span style="color: #007bff; font-weight: bold;">🏗️</span> **Code Architecture**<br>• Code structure guidance and implementation strategy<br>• Best practices and coding standards<br>• Integration patterns and API design<br>• Documentation and code organization                       |
-| <a href="https://github.com/cline"><img src="https://github.com/cline.png" width="50" height="50" style="border-radius:50%; border: 2px solid #28a745;" alt="Cline AI"></a><br>**Cline AI**           | **Development & Coding**     | <span style="color: #28a745; font-weight: bold;">💻</span> **Code Implementation**<br>• Complete codebase development and testing<br>• Performance optimization and debugging<br>• Automated testing and CI/CD integration<br>• Code review and quality assurance                          |
-| <a href="https://github.com/google"><img src="https://github.com/google.png" width="50" height="50" style="border-radius:50%; border: 2px solid #ffc107;" alt="Gemini AI"></a><br>**Gemini AI**       | **Quality Assurance**        | <span style="color: #ffc107; font-weight: bold;">🔍</span> **Testing & Debugging**<br>• Error resolution and performance optimization<br>• Code review and quality assurance<br>• Bug detection and fix validation<br>• Security analysis and vulnerability assessment                     |
----
----
+<a href="https://github.com/sadiakant">
+  <img src="https://github.com/sadiakant.png" width="125" height="125" style="border-radius: 50%;" alt="sadiakant">
+</a>
 
-### **Technology Stack**
+**Krushnakant Sadiya** 
+<br>
+ Project Lead & Developer
+<br>
 
-<div style="display: flex; gap: 10px; flex-wrap: wrap; margin: 15px 0;">
-  <span style="background: #007bff; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">TypeScript</span>
-  <span style="background: #6f42c1; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">n8n</span>
-  <span style="background: #28a745; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">GramJS</span>
-  <span style="background: #ffc107; color: black; padding: 4px 8px; border-radius: 4px; font-size: 12px;">MTProto</span>
-  <span style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">WebSocket</span>
-  <span style="background: #20c997; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">AES-256</span>
-  <span style="background: #6c757d; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Rate Limiting</span>
-  <span style="background: #e83e8c; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Caching</span>
-  <span style="background: #fd7e14; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Validation</span>
+<a href="https://github.com/sadiakant/n8n-nodes-telegram-grampro/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=sadiakant/n8n-nodes-telegram-grampro" />
+</a>
+
+Made with [contrib.rocks](https://contrib.rocks).
+
 </div>
+
+---
 
 ### **Publishing Status**
 [![Build Status](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/build.yml/badge.svg)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/build.yml)

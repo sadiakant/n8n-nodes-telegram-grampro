@@ -379,7 +379,7 @@ async function editMessage(
 				isOutgoing,
 				direction: isOutgoing ? 'sent' : 'received',
 				hasMedia: mediaInfo.hasMedia,
-				mediaType: mediaInfo.hasMedia ? mediaInfo.mediaType : 'other',
+				mediaType: getMessageType(detailedMessage),
 				noWebpage: noWebpage,
 			},
 			pairedItem: { item: i },
@@ -466,7 +466,7 @@ async function editMessageMedia(
 					isOutgoing: detailedMessage.out,
 					direction: detailedMessage.out ? 'sent' : 'received',
 					hasMedia: !!detailedMessage.media,
-					mediaType: 'other',
+					mediaType: getMessageType(detailedMessage),
 				}),
 			},
 			pairedItem: { item: i },
@@ -533,7 +533,7 @@ async function deleteMessage(
 				isOutgoing,
 				direction: isOutgoing ? 'sent' : 'received',
 				hasMedia: mediaInfo.hasMedia,
-				mediaType: mediaInfo.hasMedia ? mediaInfo.mediaType : 'other',
+				mediaType: getMessageType(detailedMessage),
 				deletedId: messageId,
 				revoked: revoke,
 				'Delete of Everyone': revoke,
@@ -684,7 +684,7 @@ async function pinMessage(
 				isOutgoing,
 				direction: isOutgoing ? 'sent' : 'received',
 				hasMedia: mediaInfo.hasMedia,
-				mediaType: mediaInfo.hasMedia ? mediaInfo.mediaType : 'other',
+				mediaType: getMessageType(detailedMessage),
 				notified: notify,
 				pinnedId: messageId,
 			},
@@ -709,13 +709,12 @@ async function sendText(
 	let fileToSend: CustomFile | undefined;
 	let hasMedia = false;
 	let mediaType: string = 'other';
+	const selectedType = this.getNodeParameter('mediaType', i, 'document') as string;
 
-	if (attachMedia) {
+	if (attachMedia && selectedType !== 'text') {
 		const binaryProperty = this.getNodeParameter('mediaBinaryProperty', i, 'data') as string;
 		const items = this.getInputData();
 		const item = items[i];
-
-		const selectedType = this.getNodeParameter('mediaType', i, 'document') as string;
 
 		const binaryData = item?.binary?.[binaryProperty];
 
@@ -752,8 +751,7 @@ async function sendText(
 	);
 
 	const msg = result;
-	const mediaInfo = extractMediaInfo(msg.media);
-	const resolvedMediaType = hasMedia ? mediaType : mediaInfo.mediaType || 'other';
+	const resolvedMediaType = hasMedia ? mediaType : getMessageType(msg);
 	const chatIdStr = chatId?.toString?.() ?? '';
 	const textStr = text ?? '';
 	return await formatSendResult.call(
@@ -762,7 +760,7 @@ async function sendText(
 		msg,
 		chatIdStr,
 		textStr,
-		hasMedia || mediaInfo.hasMedia,
+		hasMedia,
 		resolvedMediaType,
 		replyTo,
 		i,
@@ -805,7 +803,7 @@ async function formatSendResult(
 
 	const mediaInfo = extractMediaInfo(msg.media);
 	const finalHasMedia = hasMedia || mediaInfo.hasMedia;
-	const finalMediaType = hasMedia ? mediaType : mediaInfo.mediaType;
+	const finalMediaType = hasMedia ? mediaType : getMessageType(msg);
 	const messageDate = msg.date;
 	const finalText = getMessageText(msg, text);
 	const isOutgoing = msg.out !== undefined ? msg.out : true;
@@ -828,7 +826,7 @@ async function formatSendResult(
 				isOutgoing,
 				direction: isOutgoing ? 'sent' : 'received',
 				hasMedia: finalHasMedia,
-				mediaType: finalHasMedia ? finalMediaType : 'other',
+				mediaType: finalMediaType,
 				replyToId,
 			},
 			pairedItem: { item: i },
@@ -903,6 +901,15 @@ function extractMediaInfo(media: TelegramMediaView | undefined): {
 	}
 
 	return { hasMedia: true, mediaType: 'other' };
+}
+
+function getMessageType(message: TelegramMessageView | null | undefined): string {
+	const mediaInfo = extractMediaInfo(message?.media);
+	if (mediaInfo.hasMedia) {
+		return mediaInfo.mediaType;
+	}
+
+	return getMessageText(message).trim() ? 'text' : 'other';
 }
 
 function formatDateWithTime(date: Date): string {
@@ -982,7 +989,7 @@ async function forwardMessage(
 				isOutgoing,
 				direction: isOutgoing ? 'sent' : 'received',
 				hasMedia: mediaInfo.hasMedia,
-				mediaType: mediaInfo.hasMedia ? mediaInfo.mediaType : 'other',
+				mediaType: getMessageType(msg),
 				replyToId,
 			},
 			pairedItem: { item: i },
@@ -1080,20 +1087,15 @@ async function getHistory(
 	for (const m of messages) {
 		if (!m || m._ === 'MessageEmpty') continue;
 
-		const isPhoto = !!m.media?.photo;
-		const isDocument = !!m.media?.document;
-		const isVideo =
-			!!m.media?.video || (isDocument && m.media?.document?.mimeType?.includes('video'));
-		const hasMedia = isPhoto || isDocument || isVideo || !!m.media;
+		const mediaInfo = extractMediaInfo(m.media);
+		const messageType = getMessageType(m);
+		const hasMedia = mediaInfo.hasMedia;
+		const wantsNonMediaMessages = mediaTypes.includes('text') || mediaTypes.includes('other');
 
-		if (onlyMedia && !hasMedia) continue;
+		if (onlyMedia && !hasMedia && !wantsNonMediaMessages) continue;
 
-		if (onlyMedia && mediaTypes.length > 0) {
-			let match = false;
-			if (mediaTypes.includes('photo') && isPhoto) match = true;
-			if (mediaTypes.includes('video') && isVideo) match = true;
-			if (mediaTypes.includes('document') && isDocument && !isVideo) match = true;
-			if (!match) continue;
+		if (onlyMedia && mediaTypes.length > 0 && !mediaTypes.includes(messageType)) {
+			continue;
 		}
 
 		items.push({
@@ -1110,7 +1112,7 @@ async function getHistory(
 				isOutgoing: m.out,
 				direction: m.out ? 'sent' : 'received',
 				hasMedia,
-				mediaType: isPhoto ? 'photo' : isVideo ? 'video' : isDocument ? 'document' : 'other',
+				mediaType: messageType,
 			},
 			pairedItem: { item: i },
 		});
@@ -1185,7 +1187,7 @@ async function unpinMessage(
 				isOutgoing,
 				direction: isOutgoing ? 'sent' : 'received',
 				hasMedia: mediaInfo.hasMedia,
-				mediaType: mediaInfo.hasMedia ? mediaInfo.mediaType : 'other',
+				mediaType: getMessageType(detailedMessage),
 				unpinnedId: messageId,
 			},
 			pairedItem: { item: i },
@@ -1414,11 +1416,6 @@ async function copyRestrictedContent(
 
 		// 4. Handle different media types
 		let result: TelegramMessageView;
-		const isPhoto = !!message.media?.photo;
-		const isDocument = !!message.media?.document;
-		const isVideo =
-			!!message.media?.video ||
-			(isDocument && message.media?.document?.mimeType?.includes('video'));
 
 		if (message.media?.photo) {
 			result = await handlePhoto(client, message, finalTargetChatId, {
@@ -1471,7 +1468,7 @@ async function copyRestrictedContent(
 					timestamp: result.date,
 					originalMessageId: messageId,
 					sourceChatId: sourceChatId,
-					mediaType: isPhoto ? 'photo' : isVideo ? 'video' : isDocument ? 'document' : 'other',
+					mediaType: getMessageType(message),
 				},
 				pairedItem: { item: i },
 			},
