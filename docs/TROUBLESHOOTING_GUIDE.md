@@ -4,6 +4,40 @@
 
 This comprehensive troubleshooting guide helps you diagnose and resolve common issues with the Telegram GramPro n8n node. Whether you're facing authentication problems, connection issues, or operation errors, this guide provides step-by-step solutions with enhanced error handling and new features.
 
+## Trigger Filter Troubleshooting
+
+### Restrict to Chat IDs or User IDs matches only one source
+
+If your comma-separated restriction fields appear to match only one item, verify the values and ID formats:
+
+- Separate multiple entries with commas, for example:
+
+```text
+5195348540, -1003783027945, @sadia_kant, sadia_kant
+```
+
+- Matching supports equivalent numeric ID forms:
+  - `519...`
+  - `-519...`
+  - `-100519...`
+- Username values can be used with or without `@`
+- `Restrict to Chat IDs/Usernames` checks chat identifiers
+- `Restrict to User IDs/Usernames` checks sender identifiers
+
+If no items match, the trigger emits no events.
+
+### Trigger does not fire for my own sent messages
+
+Check `Message Direction`. Telegram user accounts receive both incoming and outgoing updates, but the trigger defaults to `Incoming Only` to avoid feedback loops.
+
+### Trigger does not fire for channel or group messages
+
+Check these points:
+
+- `Restrict to Chat Types` must include `Channel` and/or `Group`
+- Your `Trigger On` selection must include the relevant update type
+- Your chat/user restriction fields must match the actual channel or sender identifiers
+
 ## 🚨 Common Issues & Solutions
 
 ### **Authentication Errors**

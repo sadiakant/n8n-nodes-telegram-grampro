@@ -124,6 +124,34 @@ For detailed documentation of all operations with parameters, examples, and use 
 | **Media**             | Download Media Files                                                                                        |
 | **Channel**           | Add Member, Remove Member, Ban User, Unban User, Promote to Admin, Get Members                              |
 
+## Trigger Improvements
+
+Telegram GramPro now provides one MTProto trigger node:
+
+- `Telegram GramPro Trigger` (`telegramGramProTrigger`)
+
+Unlike the official n8n Telegram bot trigger, Telegram user accounts cannot register Bot API webhooks. GramPro keeps a live MTProto session connected while the workflow is active.
+
+Supported updates:
+
+- `Message`
+- `Edited Message`
+
+User-account specific filters:
+- `Message Direction`: `Incoming Only`, `Outgoing Only`, `Both`
+- `Restrict to Chat Types`: `Private`, `Group`, `Channel`
+- `Restrict to Chat IDs/Usernames`
+- `Restrict to User IDs/Usernames`
+- Numeric IDs are matched across equivalent forms such as `519...`, `-519...`, and `-100519...`
+
+Trigger output is readable-only (`raw` removed) and includes:
+- `updateType`, `message`, `date` (ISO UTC), `editDate`, `chatName`, `chatId`, `senderName`, `senderId`, `messageId`
+- `isPrivate`, `isGroup`, `isChannel`, `isOutgoing`, `messageType` (`text`, `photo`, `video`, `document`, `other`)
+
+Binary output behavior:
+- For `photo`, `video`, and `document`, media is attached in `binary.data`
+- If media download fails, JSON is still emitted with `mediaDownloadError`
+
 ## 🛡️ Security Features
 
 ### **Session Encryption**
@@ -262,6 +290,11 @@ n8n-nodes-telegram-grampro/
     │
     └── 🔔 TelegramGramProTrigger/
         ├── TelegramGramProTrigger.node.ts
+        ├── trigger.shared.ts
+        ├── Modes/
+        │   ├── Manual/manual.mode.ts
+        │   ├── Schedule/schedule.mode.ts
+        │   └── Webhook/webhook.mode.ts
         └── telegram-grampro.svg
 ```
 

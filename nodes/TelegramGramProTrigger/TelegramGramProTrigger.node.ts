@@ -1,32 +1,64 @@
-import {
-	IDataObject,
-	ITriggerFunctions,
+import type {
+	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
+	ITriggerFunctions,
 	ITriggerResponse,
-	NodeConnectionTypes,
-	NodeOperationError,
 } from 'n8n-workflow';
-import { getClient } from '../TelegramGramPro/core/clientManager';
+import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
+import { Api } from 'telegram';
+import { EditedMessage } from 'telegram/events/EditedMessage';
+import { NewMessage } from 'telegram/events/NewMessage';
+import type { EditedMessageEvent } from 'telegram/events/EditedMessage';
+import type { NewMessageEvent } from 'telegram/events/NewMessage';
+
 import { testTelegramApi } from '../../credentials/TelegramGramProApi.credentials';
-import { NewMessage, NewMessageEvent } from 'telegram/events';
+import { getClient } from '../TelegramGramPro/core/clientManager';
 import { logger } from '../TelegramGramPro/core/logger';
-import type {
-	TelegramCredentials,
-	TelegramTriggerHandlerRegistration,
-	TelegramTriggerPayload,
-} from '../TelegramGramPro/core/types';
+import type { TelegramCredentials } from '../TelegramGramPro/core/types';
+import {
+	buildTriggerPayload,
+	createDedupeTracker,
+	createExecutionItem,
+	createMessageDeduplicationKey,
+	parseTriggerConfig,
+	resolveMessageContext,
+	shouldProcessMessage,
+	type SupportedUpdate,
+} from './trigger.shared';
+
+type RegisteredHandler = {
+	event: NewMessage | EditedMessage;
+	handler: (event: NewMessageEvent | EditedMessageEvent) => void;
+};
 
 export class TelegramGramProTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Telegram GramPro Trigger',
-		icon: 'file:telegram-grampro.svg',
 		name: 'telegramGramProTrigger',
+		icon: 'file:telegram-grampro.svg',
 		group: ['trigger'],
 		version: 1,
-		description: 'Triggers on Telegram updates',
+		subtitle: '=Updates: {{$parameter["updates"].join(", ")}}',
+		description: 'Starts the workflow on Telegram user account updates',
 		defaults: {
 			name: 'Telegram GramPro Trigger',
+		},
+		codex: {
+			categories: ['Communication'],
+			alias: ['Telegram GramPro Trigger', 'GramPro Trigger'],
+			resources: {
+				credentialDocumentation: [
+					{
+						url: 'https://github.com/sadiakant/n8n-nodes-telegram-grampro/blob/main/docs/AUTHORIZATION_GUIDE.md',
+					},
+				],
+				primaryDocumentation: [
+					{
+						url: 'https://github.com/sadiakant/n8n-nodes-telegram-grampro/blob/main/docs/OPERATIONS_GUIDE.md',
+					},
+				],
+			},
 		},
 		inputs: [],
 		outputs: [NodeConnectionTypes.Main],
@@ -39,35 +71,107 @@ export class TelegramGramProTrigger implements INodeType {
 		],
 		properties: [
 			{
-				displayName: 'Events',
-				name: 'events',
-				type: 'multiOptions',
-				options: [{ name: 'New Message', value: 'newMessage' }],
-				default: ['newMessage'],
-				required: true,
-				description: 'The events to listen for',
-			},
-			{
-				displayName: 'Chats',
-				name: 'chats',
-				type: 'string',
+				displayName:
+					'Telegram user accounts do not support Bot API webhooks. This trigger keeps your MTProto session connected while the workflow is active.',
+				name: 'userAccountNotice',
+				type: 'notice',
 				default: '',
-				description:
-					'Specific Chat IDs, Usernames, or Invite Links to listen to. Leave empty to listen to all chats.',
 			},
 			{
-				displayName: 'Incoming Messages',
-				name: 'incoming',
-				type: 'boolean',
-				default: true,
-				description: 'Whether to trigger on incoming messages',
+				displayName: 'Trigger On',
+				name: 'updates',
+				type: 'multiOptions',
+				required: true,
+				default: ['message'],
+				options: [
+					{
+						name: 'Message',
+						value: 'message',
+						description:
+							'Trigger on new messages from private chats, groups, channels, or bots',
+					},
+					{
+						name: 'Edited Message',
+						value: 'edited_message',
+						description: 'Trigger when an existing message visible to the account is edited',
+					},
+				],
 			},
 			{
-				displayName: 'Outgoing Messages',
-				name: 'outgoing',
-				type: 'boolean',
-				default: false,
-				description: 'Whether to trigger on outgoing messages sent by you',
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				placeholder: 'Add Field',
+				default: {},
+				options: [
+					{
+						displayName: 'Download Images/Files',
+						name: 'download',
+						type: 'boolean',
+						default: false,
+						description:
+							'Whether to attach media for photos, videos, and documents in binary.data',
+					},
+					{
+						displayName: 'Message Direction',
+						name: 'messageDirection',
+						type: 'options',
+						default: 'incoming',
+						options: [
+							{
+								name: 'Incoming Only',
+								value: 'incoming',
+							},
+							{
+								name: 'Outgoing Only',
+								value: 'outgoing',
+							},
+							{
+								name: 'Both',
+								value: 'both',
+							},
+						],
+						description:
+							'User accounts receive both incoming and outgoing updates, so choose which direction should trigger the workflow',
+					},
+					{
+						displayName: 'Restrict to Chat IDs/Usernames',
+						name: 'chatIds',
+						type: 'string',
+						default: '',
+						description:
+							'Comma-separated chat IDs, @usernames, or titles to match. Numeric aliases such as 123, -123, and -100123 are matched automatically.',
+					},
+					{
+						displayName: 'Restrict to Chat Types',
+						name: 'chatTypes',
+						type: 'multiOptions',
+						default: ['private', 'group', 'channel'],
+						options: [
+							{
+								name: 'Private',
+								value: 'private',
+							},
+							{
+								name: 'Group',
+								value: 'group',
+							},
+							{
+								name: 'Channel',
+								value: 'channel',
+							},
+						],
+						description: 'Which chat sources are allowed to emit events',
+					},
+					{
+						displayName: 'Restrict to User IDs/Usernames',
+						name: 'userIds',
+						type: 'string',
+						default: '',
+						description:
+							'Comma-separated sender IDs, @usernames, or names to match. Numeric aliases such as 123, -123, and -100123 are matched automatically.',
+					},
+				],
 			},
 		],
 		usableAsTool: true,
@@ -80,97 +184,143 @@ export class TelegramGramProTrigger implements INodeType {
 	};
 
 	async trigger(this: ITriggerFunctions): Promise<ITriggerResponse> {
-		const creds = (await this.getCredentials('telegramGramProApi')) as TelegramCredentials;
-
-		if (!creds) {
-			throw new NodeOperationError(this.getNode(), 'No credentials found');
+		const credentials = (await this.getCredentials('telegramGramProApi')) as TelegramCredentials;
+		if (!credentials) {
+			throw new NodeOperationError(this.getNode(), 'Telegram GramPro credentials are required.');
 		}
 
-		const events = this.getNodeParameter('events', []) as string[];
-		const chats = this.getNodeParameter('chats', '') as string;
-		const incoming = this.getNodeParameter('incoming', true) as boolean;
-		const outgoing = this.getNodeParameter('outgoing', false) as boolean;
+		const config = parseTriggerConfig(this);
+		const client = await getClient(credentials.apiId, credentials.apiHash, credentials.session, {
+			receiveUpdates: true,
+			cacheClient: true,
+			verifyAuthorization: true,
+			autoReconnect: true,
+		});
 
-		const client = await getClient(creds.apiId, creds.apiHash, creds.session);
-
-		if (!client) {
-			throw new NodeOperationError(this.getNode(), 'Failed to initialize Telegram client.');
-		}
-
-		// Ensure connected
 		if (!client.connected) {
 			await client.connect();
 		}
 
-		const chatIds = chats
-			.split(',')
-			.map((c) => c.trim())
-			.filter((c) => c);
+		const dedupe = createDedupeTracker();
+		const handlers: RegisteredHandler[] = [];
 
-		// BigInt replacer for JSON serialization
-		const replacer = (_key: string, value: unknown): unknown => {
-			if (typeof value === 'bigint') {
-				return value.toString();
-			}
-			return value;
-		};
+		for (const updateType of config.updates) {
+			const registration = createRegistration(
+				updateType,
+				async (items) => {
+					this.emit([items]);
+				},
+				this,
+				client,
+				config,
+				dedupe,
+			);
 
-		const eventHandler = async (event: NewMessageEvent) => {
-			try {
-				const msg = event.message;
-
-				if (msg) {
-					const raw = JSON.parse(JSON.stringify(msg, replacer)) as IDataObject;
-					const data: TelegramTriggerPayload = {
-						message: msg.message,
-						date: msg.date,
-						chatId: msg.chatId?.toString(),
-						senderId: msg.senderId?.toString(),
-						isPrivate: msg.isPrivate,
-						isGroup: msg.isGroup,
-						isChannel: msg.isChannel,
-						raw,
-					};
-
-					this.emit([this.helpers.returnJsonArray(data)]);
-				}
-			} catch (error) {
-				logger.error('Error processing Telegram event', {
-					error: error instanceof Error ? error.message : String(error),
-				});
-			}
-		};
-
-		// Track event handlers for proper cleanup
-		const eventHandlers: TelegramTriggerHandlerRegistration[] = [];
-
-		if (events.includes('newMessage')) {
-			const eventFilter = new NewMessage({
-				chats: chatIds.length > 0 ? chatIds : undefined,
-				incoming: incoming,
-				outgoing: outgoing,
-			});
-			client.addEventHandler(eventHandler, eventFilter);
-			eventHandlers.push({ handler: eventHandler, event: eventFilter });
+			client.addEventHandler(registration.handler, registration.event);
+			handlers.push(registration);
 		}
+
+		logger.info('[TelegramGramProTrigger] Trigger activated', {
+			nodeName: this.getNode().name,
+			updates: config.updates.join(','),
+			messageDirection: config.messageDirection,
+			chatTypes: config.chatTypes.join(','),
+		});
 
 		return {
 			closeFunction: async () => {
-				logger.debug('[TelegramTrigger] Cleaning up event handlers...');
-				// Remove all event handlers to prevent memory leaks
-				for (const { handler, event } of eventHandlers) {
+				for (const { handler, event } of handlers) {
 					try {
 						client.removeEventHandler(handler, event);
 					} catch (error) {
-						logger.error('Error removing event handler', {
-							error: error instanceof Error ? error.message : String(error),
+						logger.warn('[TelegramGramProTrigger] Failed to remove event handler', {
+							error: getErrorMessage(error),
+							updateEvent: event.constructor.name,
 						});
 					}
 				}
-				eventHandlers.length = 0;
-				// Note: We don't disconnect the client as it might be shared with other nodes
-				logger.debug('[TelegramTrigger] Event handlers cleaned up successfully');
+
+				if (client.listEventHandlers().length === 0) {
+					try {
+						await client.disconnect();
+					} catch (error) {
+						logger.warn('[TelegramGramProTrigger] Failed to disconnect update client', {
+							error: getErrorMessage(error),
+						});
+					}
+				}
+
+				logger.info('[TelegramGramProTrigger] Trigger deactivated', {
+					nodeName: this.getNode().name,
+				});
 			},
 		};
 	}
+}
+
+function createRegistration(
+	updateType: SupportedUpdate,
+	emit: (items: INodeExecutionData[]) => Promise<void>,
+	context: ITriggerFunctions,
+	client: Awaited<ReturnType<typeof getClient>>,
+	config: ReturnType<typeof parseTriggerConfig>,
+	dedupe: ReturnType<typeof createDedupeTracker>,
+): RegisteredHandler {
+	const processEvent = async (
+		event: NewMessageEvent | EditedMessageEvent,
+		currentUpdateType: SupportedUpdate,
+	): Promise<void> => {
+		try {
+			const message = event.message;
+			if (!(message instanceof Api.Message)) {
+				return;
+			}
+
+			const dedupeKey = createMessageDeduplicationKey(currentUpdateType, message);
+			if (!dedupe.shouldEmit(dedupeKey)) {
+				return;
+			}
+
+			const messageContext = await resolveMessageContext(message);
+			if (!shouldProcessMessage(message, messageContext, config)) {
+				return;
+			}
+
+			const payload = buildTriggerPayload(currentUpdateType, message, messageContext);
+			const item = await createExecutionItem(context, message, payload, config);
+			await emit([item]);
+		} catch (error) {
+			logger.error('[TelegramGramProTrigger] Failed to process Telegram update', {
+				error: getErrorMessage(error),
+				updateType: currentUpdateType,
+				nodeName: context.getNode().name,
+			});
+		}
+	};
+
+	if (updateType === 'edited_message') {
+		const event = new EditedMessage({});
+		const handler = (eventData: EditedMessageEvent): void => {
+			void processEvent(eventData, 'edited_message');
+		};
+
+		return {
+			event,
+			handler,
+		};
+	}
+
+	const event = new NewMessage({});
+	const handler = (eventData: NewMessageEvent): void => {
+		void processEvent(eventData, 'message');
+	};
+
+	return {
+		event,
+		handler,
+	};
+}
+
+function getErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }

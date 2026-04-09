@@ -4,6 +4,64 @@
 
 This guide provides comprehensive documentation for all operations available in the Telegram GramPro n8n node. Each operation is designed to work seamlessly with Telegram's MTProto protocol through GramJS, with enterprise-grade security, performance optimization, and comprehensive error handling.
 
+## Trigger Nodes
+
+Telegram GramPro now provides one unified trigger node:
+
+- `Telegram GramPro Trigger` (`telegramGramProTrigger`)
+
+This trigger uses a persistent MTProto listener. Telegram user accounts do not support the Bot API webhook registration flow used by the official n8n Telegram bot trigger.
+
+### Trigger Events
+
+Supported updates:
+
+- `Message`
+- `Edited Message`
+
+### Trigger Filters
+
+- **Message Direction**: Capture `Incoming Only`, `Outgoing Only`, or `Both`.
+- **Restrict to Chat Types**: Limit events to `Private`, `Group`, and/or `Channel`.
+- **Restrict to Chat IDs/Usernames**: Match chat IDs, usernames, or titles.
+- **Restrict to User IDs/Usernames**: Match sender IDs, usernames, or names.
+
+### Identifier Matching
+
+- Username values can be used with or without `@`.
+- Matching supports:
+  - chat ID / sender ID
+  - chat username/title
+  - sender username/display name
+- Numeric IDs are matched across equivalent forms such as `519...`, `-519...`, and `-100519...`.
+
+### Trigger Output (Readable)
+
+The trigger payload now emits:
+
+- `updateType`
+- `message`
+- `date` (ISO 8601 UTC)
+- `editDate`
+- `chatName`
+- `chatId`
+- `senderName`
+- `senderId`
+- `messageId`
+- `isPrivate`
+- `isGroup`
+- `isChannel`
+- `isOutgoing`
+- `messageType` (`text`, `photo`, `video`, `document`, `other`)
+
+Legacy `raw` output is removed.
+
+### Binary Media Output
+
+- `binary.data` is attached only for `photo`, `video`, and `document`.
+- Text/other message types do not include binary.
+- If media download fails, the trigger still emits JSON and adds `mediaDownloadError`.
+
 ## 🎯 Operations Reference
 
 ### **Message Operations**

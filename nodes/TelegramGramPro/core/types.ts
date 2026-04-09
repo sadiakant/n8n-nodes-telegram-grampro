@@ -28,13 +28,21 @@ export type TelegramUnknownRecord = Record<string, unknown>;
 export type TelegramLoggerContext = LogMetadata | Error | TelegramUnknownRecord | undefined;
 
 export interface TelegramTriggerPayload extends IDataObject {
+	updateType?: 'message' | 'edited_message';
 	message?: string;
-	date?: string | number | Date | null;
-	chatId?: string;
+	date?: string | null;
+	editDate?: string | null;
+	chatName?: string | null;
+	chatId?: string | null;
+	senderName?: string | null;
 	senderId?: string | null;
+	messageId?: string;
 	isPrivate?: boolean;
 	isGroup?: boolean;
 	isChannel?: boolean;
+	isOutgoing?: boolean;
+	messageType?: 'text' | 'photo' | 'video' | 'document' | 'other';
+	mediaDownloadError?: string;
 	raw?: IDataObject;
 }
 

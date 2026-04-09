@@ -23,6 +23,25 @@ export class TelegramGramPro implements INodeType {
 		version: 1,
 		description: 'Advanced Telegram MTProto client',
 		defaults: { name: 'Telegram GramPro' },
+		codex: {
+			categories: ['Communication'],
+			alias: ['Telegram GramPro', 'GramPro'],
+			subcategories: {
+				'Telegram GramPro': ['telegramGramProTrigger'],
+			},
+			resources: {
+				credentialDocumentation: [
+					{
+						url: 'https://github.com/sadiakant/n8n-nodes-telegram-grampro#credentials',
+					},
+				],
+				primaryDocumentation: [
+					{
+						url: 'https://github.com/sadiakant/n8n-nodes-telegram-grampro#readme',
+					},
+				],
+			},
+		},
 		inputs: ['main'],
 		outputs: ['main'],
 

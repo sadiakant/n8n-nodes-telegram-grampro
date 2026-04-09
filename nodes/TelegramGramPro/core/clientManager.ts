@@ -5,6 +5,13 @@ import { logger } from './logger';
 import { SessionEncryption } from './sessionEncryption';
 import * as crypto from 'crypto';
 
+type GetClientOptions = {
+	receiveUpdates?: boolean;
+	cacheClient?: boolean;
+	verifyAuthorization?: boolean;
+	autoReconnect?: boolean;
+};
+
 // Store active clients
 const clients = new Map<string, TelegramClient>();
 // Store active connection promises to prevent race conditions (Thundering Herd)
@@ -41,20 +48,27 @@ export async function getClient(
 	apiId: number | string,
 	apiHash: string,
 	session: string,
+	options: GetClientOptions = {},
 ): Promise<TelegramClient> {
 	const numericApiId = typeof apiId === 'string' ? parseInt(apiId, 10) : apiId;
+	const receiveUpdates = options.receiveUpdates ?? false;
+	const cacheClient = options.cacheClient ?? true;
+	const verifyAuthorization = options.verifyAuthorization ?? true;
+	const autoReconnect = options.autoReconnect ?? true;
 	// Use a more robust key generation to prevent collisions
-	const key = `${numericApiId}:${session.length > 20 ? session.substring(0, 20) : session}:${session.slice(-10)}`;
+	const key = `${numericApiId}:${receiveUpdates ? 'updates' : 'snapshot'}:${
+		session.length > 20 ? session.substring(0, 20) : session
+	}:${session.slice(-10)}`;
 
 	// 1. If this client is currently connecting, wait for that specific promise
-	const existingLock = connectionLocks.get(key);
+	const existingLock = cacheClient ? connectionLocks.get(key) : undefined;
 	if (existingLock) {
 		logger.debug(`[ClientManager] Waiting for existing connection lock for ${numericApiId}...`);
 		return await existingLock;
 	}
 
 	// 2. Check if we have a cached client
-	if (clients.has(key)) {
+	if (cacheClient && clients.has(key)) {
 		const existingClient = clients.get(key)!;
 
 		// Quick Health Check
@@ -78,7 +92,9 @@ export async function getClient(
 
 	// 3. Create a new Connection (Protected by a Lock)
 	const connectPromise = (async () => {
-		logger.info(`[ClientManager] Initializing new client for ${numericApiId}...`);
+		logger.info(
+			`[ClientManager] Initializing new client for ${numericApiId} (receiveUpdates=${receiveUpdates}, cacheClient=${cacheClient})...`,
+		);
 
 		// Decrypt session if it's encrypted
 		let decryptedSession = session;
@@ -105,19 +121,22 @@ export async function getClient(
 		const client = new TelegramClient(stringSession, numericApiId, apiHash, {
 			connectionRetries: 5,
 			useWSS: false, // TCP is more stable for server-side n8n than WSS
-			autoReconnect: true,
+			autoReconnect,
 		});
 		client.setLogLevel(LogLevel.ERROR);
 
 		try {
 			await client.connect();
 
-			// 4. Validate the connection actually works (Ping)
-			// We use 'getMe' as a lightweight verification that we are authorized and socket is alive
-			await client.getMe();
+			// Verify authorization only when we intend to keep using this client.
+			if (verifyAuthorization) {
+				await client.getMe();
+			}
 
 			logger.info(`[ClientManager] Connection established for ${numericApiId}`);
-			clients.set(key, client);
+			if (cacheClient) {
+				clients.set(key, client);
+			}
 			return client;
 		} catch (error) {
 			logger.error(`[ClientManager] Connection failed for ${numericApiId}: ${error}`);
@@ -131,8 +150,10 @@ export async function getClient(
 	})();
 
 	// Set the lock and track timestamp
-	connectionLocks.set(key, connectPromise);
-	connectionTimestamps.set(key, Date.now());
+	if (cacheClient) {
+		connectionLocks.set(key, connectPromise);
+		connectionTimestamps.set(key, Date.now());
+	}
 
 	return await connectPromise;
 }
