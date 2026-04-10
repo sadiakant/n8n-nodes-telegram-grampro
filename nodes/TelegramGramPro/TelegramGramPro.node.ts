@@ -3,6 +3,7 @@ import {
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
+	NodeConnectionTypes,
 	NodeOperationError,
 } from 'n8n-workflow';
 import { testTelegramApi } from '../../credentials/TelegramGramProApi.credentials';
@@ -50,8 +51,8 @@ export class TelegramGramPro implements INodeType {
 				],
 			},
 		},
-		inputs: ['main'],
-		outputs: ['main'],
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
 
 		credentials: [
 			{
@@ -653,9 +654,9 @@ export class TelegramGramPro implements INodeType {
 				name: 'mode',
 				type: 'options',
 				options: [
-					{ name: 'Recent Messages (Limit)', value: 'limit' },
-					{ name: 'Last X Hours', value: 'hours' },
 					{ name: 'Date Range', value: 'range' },
+					{ name: 'Last X Hours', value: 'hours' },
+					{ name: 'Recent Messages (Limit)', value: 'limit' },
 				],
 				default: 'limit',
 				displayOptions: {
@@ -1596,10 +1597,10 @@ export class TelegramGramPro implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'Small', value: 'small' },
-					{ name: 'Medium', value: 'medium' },
-					{ name: 'Large', value: 'large' },
 					{ name: 'Full', value: 'full' },
+					{ name: 'Large', value: 'large' },
+					{ name: 'Medium', value: 'medium' },
+					{ name: 'Small', value: 'small' },
 				],
 				description: 'Size of the profile photo to download',
 			},
