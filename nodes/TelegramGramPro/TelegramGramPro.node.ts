@@ -1753,5 +1753,6 @@ export class TelegramGramPro implements INodeType {
 		}
 
 		return [returnData];
+		
 	}
 }
