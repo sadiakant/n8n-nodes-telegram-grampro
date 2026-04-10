@@ -304,7 +304,7 @@ n8n-nodes-telegram-grampro/
     │   │   ├── logger.ts, operationHelpers.ts, qrPng.ts
     │   │   ├── rateLimiter.ts, sessionEncryption.ts
     │   │   ├── telegramErrorMapper.ts, validation.ts
-    │   │   └── types.ts
+    │   │   └── types.ts, messageFormatting.ts
     │   └── resources/
     │       ├── authentication.operations.ts
     │       ├── channel.operations.ts
@@ -333,11 +333,6 @@ Ready-to-import workflow examples are available in [`docs/Workflows-Examples`](.
 3. Choose one of the JSON files from `docs/Workflows-Examples/`.
 4. Re-map `telegramGramProApi` credentials to your own Telegram GramPro credential.
 5. Replace placeholders such as source/target chats, admin usernames, and sub-workflow IDs.
-
-### What These Examples Cover
-
-- **Send messages from one user to multiple users.json**: Pulls recent messages from one source, filters by recency and keyword/domain, then distributes to multiple target chats with flood-wait and error notifications.
-- **Send messages from folder chats to user.json**: Reads dialogs grouped by folders, filters recent media messages, then forwards matched content to a target user with scheduling and error handling.
 
 ## Advanced Configuration
 

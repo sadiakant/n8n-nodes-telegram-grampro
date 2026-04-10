@@ -863,25 +863,6 @@ export class TelegramGramPro implements INodeType {
 				},
 				description: 'Optional formatting entities for the caption (e.g., bold, italic, links)',
 			},
-			{
-				displayName: 'Parse Mode',
-				name: 'parseMode',
-				type: 'options',
-				default: 'default',
-				displayOptions: {
-					show: {
-						resource: ['message'],
-						operation: ['editMessageMedia'],
-					},
-				},
-				options: [
-					{ name: 'Default', value: 'default' },
-					{ name: 'HTML', value: 'html' },
-					{ name: 'Markdown', value: 'markdown' },
-				],
-				description:
-					'Text formatting mode for the caption. Telegram Markdown is limited (no headings/tables); use HTML for headings or table-like layouts.',
-			},
 			// --- COPY MESSAGE PROPERTIES ---
 			{
 				displayName: 'Source Chat',
@@ -1754,6 +1735,5 @@ export class TelegramGramPro implements INodeType {
 		}
 
 		return [returnData];
-		
 	}
 }

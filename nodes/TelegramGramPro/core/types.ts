@@ -30,6 +30,7 @@ export type TelegramLoggerContext = LogMetadata | Error | TelegramUnknownRecord 
 export interface TelegramTriggerPayload extends IDataObject {
 	updateType?: 'message' | 'edited_message';
 	message?: string;
+	rawMessage?: string;
 	date?: string | null;
 	editDate?: string | null;
 	chatName?: string | null;
@@ -42,6 +43,8 @@ export interface TelegramTriggerPayload extends IDataObject {
 	isChannel?: boolean;
 	isOutgoing?: boolean;
 	messageType?: 'text' | 'photo' | 'video' | 'document' | 'other';
+	hasMedia?: boolean;
+	hasWebPreview?: boolean;
 	mediaDownloadError?: string;
 	raw?: IDataObject;
 }
@@ -63,6 +66,8 @@ export interface TelegramMessage {
 	replyToId?: number;
 	isOutgoing: boolean;
 	direction: 'sent' | 'received';
+	hasMedia?: boolean;
+	hasWebPreview?: boolean;
 	mediaType?: string;
 }
 
@@ -215,7 +220,6 @@ export interface EditMessageMediaOptions {
 	media: Api.TypeInputMedia | TelegramFileLike;
 	caption?: string;
 	captionEntities?: Api.TypeMessageEntity[];
-	parseMode?: string;
 }
 
 /**

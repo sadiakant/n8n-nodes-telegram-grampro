@@ -181,7 +181,8 @@ export class ResponseFormatter {
 	static messageResult(message: IDataObject): INodeExecutionData[] {
 		return ResponseFormatter.success({
 			id: message.id,
-			text: message.message,
+			text: (message.text ?? message.message) as IDataObject[string],
+			rawText: (message.rawText ?? message.message) as IDataObject[string],
 			date: message.date,
 			chatId: message.chatId,
 			fromId: message.fromId,

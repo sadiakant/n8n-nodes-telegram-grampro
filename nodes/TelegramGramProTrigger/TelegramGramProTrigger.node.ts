@@ -232,12 +232,18 @@ export class TelegramGramProTrigger implements INodeType {
 		}
 
 		const config = parseTriggerConfig(this);
-		const client = await getClient(credentials.apiId, credentials.apiHash, credentials.session, {
-			receiveUpdates: true,
-			cacheClient: true,
-			verifyAuthorization: true,
-			autoReconnect: true,
-		});
+		const client = await getClient(
+			credentials.apiId,
+			credentials.apiHash,
+			credentials.session,
+			{
+				receiveUpdates: true,
+				cacheClient: true,
+				verifyAuthorization: true,
+				autoReconnect: true,
+			},
+			'trigger',
+		);
 
 		if (!client.connected) {
 			await client.connect();
@@ -290,7 +296,7 @@ export class TelegramGramProTrigger implements INodeType {
 							typeof credentials.apiId === 'string'
 								? Number.parseInt(credentials.apiId, 10)
 								: credentials.apiId;
-						await disconnectClient(apiId, credentials.session);
+						await disconnectClient(apiId, credentials.session, 'trigger');
 					} catch (error) {
 						logger.warn('[TelegramGramProTrigger] Failed to disconnect update client', {
 							error: getErrorMessage(error),

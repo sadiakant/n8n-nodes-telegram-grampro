@@ -7,6 +7,7 @@ import type {
 	NodeParameterValueType,
 } from 'n8n-workflow';
 
+import { renderTelegramEntities } from '../TelegramGramPro/core/messageFormatting';
 import type { TelegramTriggerPayload } from '../TelegramGramPro/core/types';
 
 type ParameterContext = Pick<ITriggerFunctions, 'getNode' | 'getNodeParameter' | 'helpers'>;
@@ -39,6 +40,14 @@ export interface MessageContext {
 	senderUsername: string | null;
 	senderId: string | null;
 }
+
+type TriggerMessageEntityView = {
+	className?: string;
+	_?: string;
+	offset?: number;
+	length?: number;
+	url?: string;
+};
 
 export function parseTriggerConfig(context: ParameterContext): TriggerConfig {
 	const updates = normalizeUpdates(context.getNodeParameter('updates', ['message']));
@@ -140,10 +149,14 @@ export function buildTriggerPayload(
 	messageContext: MessageContext,
 ): TelegramTriggerPayload {
 	const messageType = detectMessageType(message);
+	const rawMessage = getMessageText(message);
+	const hasMedia = !!message.media;
+	const hasWebPreview = detectWebPreview(message);
 
 	return {
 		updateType,
-		message: message.message ?? message.text ?? '',
+		message: getRichMessageText(message),
+		rawMessage,
 		date: toIsoDate(message.date),
 		editDate: toIsoDate(message.editDate),
 		chatName: messageContext.chatName,
@@ -156,6 +169,8 @@ export function buildTriggerPayload(
 		isChannel: Boolean(message.isChannel),
 		isOutgoing: Boolean(message.out),
 		messageType,
+		hasMedia,
+		hasWebPreview,
 	};
 }
 
@@ -228,6 +243,29 @@ function normalizeUpdates(value: NodeParameterValueType | object): SupportedUpda
 	);
 
 	return parsed.length > 0 ? parsed : ['message'];
+}
+
+function getMessageText(message: Api.Message): string {
+	return message.message ?? message.text ?? '';
+}
+
+function getRichMessageText(message: Api.Message): string {
+	const text = getMessageText(message);
+	return renderTelegramEntities(text, normalizeMessageEntities(message.entities));
+}
+
+function normalizeMessageEntities(
+	entities: Api.TypeMessageEntity[] | undefined,
+): TriggerMessageEntityView[] {
+	if (!Array.isArray(entities)) {
+		return [];
+	}
+
+	return entities
+		.filter(
+			(entity): entity is Api.TypeMessageEntity => typeof entity === 'object' && entity !== null,
+		)
+		.map((entity) => entity as unknown as TriggerMessageEntityView);
 }
 
 function normalizeListeningModes(value: NodeParameterValueType | object): ListeningMode[] {
@@ -440,6 +478,23 @@ function detectMessageType(message: Api.Message): TelegramTriggerPayload['messag
 	}
 
 	return 'other';
+}
+
+function detectWebPreview(message: Api.Message): boolean {
+	if (!message.media) {
+		return false;
+	}
+
+	if (message.media instanceof Api.MessageMediaWebPage) {
+		return !(message.media.webpage instanceof Api.WebPageEmpty);
+	}
+
+	// Sometimes web page preview is inside the media directly in different format
+	if ('webpage' in message.media) {
+		return !!message.media.webpage && !(message.media.webpage instanceof Api.WebPageEmpty);
+	}
+
+	return false;
 }
 
 function shouldAttachBinary(messageType: TelegramTriggerPayload['messageType']): boolean {

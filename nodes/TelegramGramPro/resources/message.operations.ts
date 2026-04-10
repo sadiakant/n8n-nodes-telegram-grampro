@@ -7,6 +7,7 @@ import bigInt from 'big-integer';
 import { CustomFile } from 'telegram/client/uploads';
 
 import { logger } from '../core/logger';
+import { prepareTelegramTextInput, renderTelegramEntities } from '../core/messageFormatting';
 import type { TelegramClientInstance, TelegramCredentials } from '../core/types';
 
 type Stringable = { toString: () => string } | string | number | bigint;
@@ -37,6 +38,17 @@ type TelegramDocumentAttributeView = {
 	className?: string;
 	fileName?: string;
 	text?: string;
+};
+
+type TelegramMessageEntityView = {
+	className?: string;
+	_?: string;
+	offset?: number;
+	length?: number;
+	url?: string;
+	userId?: Stringable;
+	user_id?: Stringable;
+	language?: string;
 };
 
 type TelegramPollAnswerView = {
@@ -156,6 +168,24 @@ function getMessageText(message: TelegramMessageView | null | undefined, fallbac
 	return message?.message ?? message?.text ?? message?.caption ?? fallback;
 }
 
+function getRichMessageText(
+	message: TelegramMessageView | null | undefined,
+	fallback = '',
+): string {
+	const text = getMessageText(message, fallback);
+	return renderTelegramEntities(text, normalizeMessageEntities(message?.entities));
+}
+
+function normalizeMessageEntities(entities: unknown[] | undefined): TelegramMessageEntityView[] {
+	if (!Array.isArray(entities)) {
+		return [];
+	}
+
+	return entities.filter(
+		(entity): entity is TelegramMessageEntityView => typeof entity === 'object' && entity !== null,
+	);
+}
+
 function getEntityLabel(entity: TelegramEntityView | null | undefined): string {
 	if (!entity) {
 		return 'Unknown';
@@ -227,7 +257,9 @@ async function sendMessageLoose(
 	peer: unknown,
 	params: Record<string, unknown>,
 ): Promise<TelegramMessageView> {
-	const result = (await client.sendMessage(peer as never, params as never)) as unknown;
+	// Resolve the peer first to handle numeric user IDs that aren't cached
+	const resolvedPeer = await resolvePeer(client, peer);
+	const result = (await client.sendMessage(resolvedPeer as never, params as never)) as unknown;
 	return (Array.isArray(result) ? result[0] : result) as TelegramMessageView;
 }
 
@@ -324,12 +356,14 @@ async function editMessage(
 	const textRaw = this.getNodeParameter('text', i);
 	const text = typeof textRaw === 'string' ? textRaw : (textRaw ?? '').toString();
 	const noWebpage = this.getNodeParameter('noWebpage', i) as boolean;
+	const formattedInput = prepareTelegramTextInput(text);
 
 	const result = await safeExecute(() =>
 		editMessageLoose(client, chatId, {
 			message: messageId,
-			text,
-			noWebpage,
+			text: formattedInput.text,
+			parseMode: formattedInput.parseMode,
+			linkPreview: !noWebpage,
 		}),
 	);
 
@@ -360,7 +394,8 @@ async function editMessage(
 	const messageDate = detailedMessage?.date;
 	const replyToId = detailedMessage?.replyTo?.replyToMsgId || null;
 	const isOutgoing = detailedMessage?.out !== undefined ? detailedMessage.out : true;
-	const finalText = getMessageText(detailedMessage, getMessageText(result, text));
+	const finalRawText = getMessageText(detailedMessage, getMessageText(result, text));
+	const finalText = getRichMessageText(detailedMessage, getRichMessageText(result, text));
 
 	return [
 		{
@@ -371,6 +406,7 @@ async function editMessage(
 				sourceName,
 				sourceId: formattedSourceId,
 				text: finalText,
+				rawText: finalRawText,
 				date: messageDate,
 				humanDate: messageDate ? formatDateWithTime(new Date(messageDate * 1000)) : null,
 				fromId: getPeerIdString(detailedMessage?.fromId),
@@ -398,11 +434,11 @@ async function editMessageMedia(
 	const media = this.getNodeParameter('media', i);
 	const captionInput = this.getNodeParameter('caption', i, '') as string;
 	const captionEntitiesInput = this.getNodeParameter('captionEntities', i, []) as unknown[];
-	const parseMode = this.getNodeParameter('parseMode', i, 'default') as string;
 
 	let finalCaption = captionInput;
 	let finalEntities = captionEntitiesInput;
 	let debugInfo = 'Using new caption';
+	const formattedCaptionInput = prepareTelegramTextInput(captionInput);
 
 	if (!captionInput || captionInput.trim() === '') {
 		try {
@@ -425,14 +461,13 @@ async function editMessageMedia(
 		editMessageLoose(client, chatId, {
 			message: messageId,
 			file: media,
-			text: finalCaption,
-			formattingEntities: finalEntities && finalEntities.length > 0 ? finalEntities : undefined,
-			parseMode:
+			text:
 				finalEntities && finalEntities.length > 0
-					? undefined
-					: parseMode !== 'default'
-						? parseMode
-						: undefined,
+					? finalCaption
+					: formattedCaptionInput.text || finalCaption,
+			parseMode:
+				finalEntities && finalEntities.length > 0 ? undefined : formattedCaptionInput.parseMode,
+			formattingEntities: finalEntities && finalEntities.length > 0 ? finalEntities : undefined,
 		}),
 	);
 
@@ -452,7 +487,8 @@ async function editMessageMedia(
 			json: {
 				success: true,
 				id: result.id,
-				text: getMessageText(result),
+				text: getRichMessageText(result),
+				rawText: getMessageText(result),
 				debug_logic: debugInfo,
 				target_chat: chatId,
 				...(detailedMessage && {
@@ -466,6 +502,7 @@ async function editMessageMedia(
 					isOutgoing: detailedMessage.out,
 					direction: detailedMessage.out ? 'sent' : 'received',
 					hasMedia: !!detailedMessage.media,
+					hasWebPreview: extractMediaInfo(detailedMessage.media).hasWebPreview,
 					mediaType: getMessageType(detailedMessage),
 				}),
 			},
@@ -513,7 +550,8 @@ async function deleteMessage(
 	const messageDate = detailedMessage?.date;
 	const replyToId = detailedMessage?.replyTo?.replyToMsgId || null;
 	const isOutgoing = detailedMessage?.out !== undefined ? detailedMessage.out : true;
-	const finalText = getMessageText(detailedMessage);
+	const finalRawText = getMessageText(detailedMessage);
+	const finalText = getRichMessageText(detailedMessage);
 	const fromId = getPeerIdString(detailedMessage?.fromId);
 
 	return [
@@ -525,6 +563,7 @@ async function deleteMessage(
 				sourceName,
 				sourceId: formattedSourceId,
 				text: finalText,
+				rawText: finalRawText,
 				date: messageDate,
 				humanDate: messageDate ? formatDateWithTime(new Date(messageDate * 1000)) : null,
 				fromId: fromId,
@@ -533,6 +572,7 @@ async function deleteMessage(
 				isOutgoing,
 				direction: isOutgoing ? 'sent' : 'received',
 				hasMedia: mediaInfo.hasMedia,
+				hasWebPreview: mediaInfo.hasWebPreview,
 				mediaType: getMessageType(detailedMessage),
 				deletedId: messageId,
 				revoked: revoke,
@@ -664,7 +704,8 @@ async function pinMessage(
 	const messageDate = detailedMessage?.date;
 	const replyToId = detailedMessage?.replyTo?.replyToMsgId || null;
 	const isOutgoing = detailedMessage?.out !== undefined ? detailedMessage.out : true;
-	const finalText = getMessageText(detailedMessage);
+	const finalRawText = getMessageText(detailedMessage);
+	const finalText = getRichMessageText(detailedMessage);
 	const fromId = getPeerIdString(detailedMessage?.fromId);
 
 	return [
@@ -676,6 +717,7 @@ async function pinMessage(
 				sourceName,
 				sourceId: formattedSourceId,
 				text: finalText,
+				rawText: finalRawText,
 				date: messageDate,
 				humanDate: messageDate ? formatDateWithTime(new Date(messageDate * 1000)) : null,
 				fromId,
@@ -684,6 +726,7 @@ async function pinMessage(
 				isOutgoing,
 				direction: isOutgoing ? 'sent' : 'received',
 				hasMedia: mediaInfo.hasMedia,
+				hasWebPreview: mediaInfo.hasWebPreview,
 				mediaType: getMessageType(detailedMessage),
 				notified: notify,
 				pinnedId: messageId,
@@ -705,13 +748,14 @@ async function sendText(
 	const webPreview = this.getNodeParameter('webPreview', i, true) as boolean;
 	const attachMedia = this.getNodeParameter('attachMedia', i, false) as boolean;
 	const mediaUrl = this.getNodeParameter('mediaUrl', i, '') as string;
+	const formattedInput = prepareTelegramTextInput(text);
 
 	let fileToSend: CustomFile | undefined;
 	let hasMedia = false;
 	let mediaType: string = 'other';
 	const selectedType = this.getNodeParameter('mediaType', i, 'document') as string;
 
-	if (attachMedia && selectedType !== 'text') {
+	if (!webPreview && attachMedia && selectedType !== 'text') {
 		const binaryProperty = this.getNodeParameter('mediaBinaryProperty', i, 'data') as string;
 		const items = this.getInputData();
 		const item = items[i];
@@ -742,10 +786,11 @@ async function sendText(
 	const result = await withRateLimit(async () =>
 		safeExecute(() =>
 			sendMessageLoose(client, chatId, {
-				message: text,
+				message: formattedInput.text,
 				replyTo: replyTo > 0 ? replyTo : undefined,
-				noWebpage: !webPreview,
+				linkPreview: webPreview,
 				file: fileToSend,
+				parseMode: formattedInput.parseMode,
 			}),
 		),
 	);
@@ -764,6 +809,11 @@ async function sendText(
 		resolvedMediaType,
 		replyTo,
 		i,
+		!!fileToSend ||
+			(msg.media &&
+				(msg.media.className === 'MessageMediaWebPage' || msg.media._ === 'messageMediaWebPage'))
+			? true
+			: undefined,
 	);
 }
 
@@ -777,6 +827,7 @@ async function formatSendResult(
 	mediaType: string,
 	replyTo: number,
 	i: number,
+	hasWebPreviewOverride?: boolean,
 ): Promise<INodeExecutionData[]> {
 	let senderId: string | null = getPeerIdString(msg.fromId);
 
@@ -805,7 +856,8 @@ async function formatSendResult(
 	const finalHasMedia = hasMedia || mediaInfo.hasMedia;
 	const finalMediaType = hasMedia ? mediaType : getMessageType(msg);
 	const messageDate = msg.date;
-	const finalText = getMessageText(msg, text);
+	const finalRawText = getMessageText(msg, text);
+	const finalText = getRichMessageText(msg, text);
 	const isOutgoing = msg.out !== undefined ? msg.out : true;
 	const replyToId = msg.replyTo?.replyToMsgId || null;
 
@@ -818,6 +870,7 @@ async function formatSendResult(
 				sourceName,
 				sourceId: formattedSourceId,
 				text: finalText,
+				rawText: finalRawText,
 				date: messageDate,
 				humanDate: messageDate ? formatDateWithTime(new Date(messageDate * 1000)) : null,
 				fromId: senderId,
@@ -826,6 +879,8 @@ async function formatSendResult(
 				isOutgoing,
 				direction: isOutgoing ? 'sent' : 'received',
 				hasMedia: finalHasMedia,
+				hasWebPreview:
+					hasWebPreviewOverride !== undefined ? hasWebPreviewOverride : mediaInfo.hasWebPreview,
 				mediaType: finalMediaType,
 				replyToId,
 			},
@@ -876,11 +931,12 @@ async function downloadUrlToBuffer(
 function extractMediaInfo(media: TelegramMediaView | undefined): {
 	hasMedia: boolean;
 	mediaType: string;
+	hasWebPreview: boolean;
 } {
-	if (!media) return { hasMedia: false, mediaType: 'other' };
+	if (!media) return { hasMedia: false, mediaType: 'other', hasWebPreview: false };
 
 	if (media.photo || media.className === 'MessageMediaPhoto' || media._ === 'messageMediaPhoto') {
-		return { hasMedia: true, mediaType: 'photo' };
+		return { hasMedia: true, mediaType: 'photo', hasWebPreview: false };
 	}
 
 	const document =
@@ -889,18 +945,35 @@ function extractMediaInfo(media: TelegramMediaView | undefined): {
 		media?._ === 'messageMediaDocument';
 	if (document) {
 		const mimeType = media.document?.mimeType || '';
-		if (mimeType.startsWith('video/')) return { hasMedia: true, mediaType: 'video' };
-		if (mimeType.startsWith('image/')) return { hasMedia: true, mediaType: 'photo' };
-		return { hasMedia: true, mediaType: 'document' };
+		if (mimeType.startsWith('video/'))
+			return { hasMedia: true, mediaType: 'video', hasWebPreview: false };
+		if (mimeType.startsWith('image/'))
+			return { hasMedia: true, mediaType: 'photo', hasWebPreview: false };
+		return { hasMedia: true, mediaType: 'document', hasWebPreview: false };
 	}
 
-	if (media.video) return { hasMedia: true, mediaType: 'video' };
+	if (media.video) return { hasMedia: true, mediaType: 'video', hasWebPreview: false };
 
 	if (media.className === 'MessageMediaWebPage' || media._ === 'messageMediaWebPage') {
-		return { hasMedia: false, mediaType: 'other' };
+		// Treat WebPage preview as not typical media, but flag it
+		const webpage = (media as Record<string, unknown>).webpage;
+		return {
+			hasMedia: false,
+			mediaType: 'other',
+			hasWebPreview: !(webpage instanceof Api.WebPageEmpty) || !!webpage,
+		};
 	}
 
-	return { hasMedia: true, mediaType: 'other' };
+	if ('webpage' in media) {
+		const webpage = (media as Record<string, unknown>).webpage;
+		return {
+			hasMedia: false,
+			mediaType: 'other',
+			hasWebPreview: !!webpage && !(webpage instanceof Api.WebPageEmpty),
+		};
+	}
+
+	return { hasMedia: true, mediaType: 'other', hasWebPreview: false };
 }
 
 function getMessageType(message: TelegramMessageView | null | undefined): string {
@@ -934,7 +1007,7 @@ function formatDateWithTime(date: Date): string {
 	const dayPeriod = part('dayPeriod');
 	const formattedDate = `${day}-${month}-${year}`;
 	const timePart = `${hour}:${minute}:${second} ${dayPeriod}`;
-	return `${formattedDate} (${timePart}) - IST`;
+	return `${formattedDate} (${timePart})`;
 }
 
 async function forwardMessage(
@@ -980,7 +1053,8 @@ async function forwardMessage(
 				id: msg.id,
 				sourceName,
 				sourceId: formattedTargetId,
-				text: getMessageText(msg),
+				text: getRichMessageText(msg),
+				rawText: getMessageText(msg),
 				date: messageDate,
 				humanDate: messageDate ? formatDateWithTime(new Date(messageDate * 1000)) : null,
 				fromId: senderId,
@@ -989,6 +1063,7 @@ async function forwardMessage(
 				isOutgoing,
 				direction: isOutgoing ? 'sent' : 'received',
 				hasMedia: mediaInfo.hasMedia,
+				hasWebPreview: mediaInfo.hasWebPreview,
 				mediaType: getMessageType(msg),
 				replyToId,
 			},
@@ -1010,7 +1085,7 @@ async function getHistory(
 
 	let replyToMsgId: number | undefined = undefined;
 
-	// Handle topic/message thread URLs like https://t.me/nghienplusofficial/1647824 or https://t.me/c/123456789/123
+	// Handle topic/message thread URLs like https://t.me/n8n_nodes_0/75 or https://t.me/c/123456789/123
 	if (!historyFromSelf && chatIdInput) {
 		const topicMatch = chatIdInput.match(
 			/(?:https?:\/\/)?t\.me\/(?:c\/)?([a-zA-Z0-9_-]+)\/(\d+)\/?$/,
@@ -1103,7 +1178,8 @@ async function getHistory(
 				id: m.id,
 				sourceName: sourceName,
 				sourceId: formattedSourceId,
-				text: getMessageText(m),
+				text: getRichMessageText(m),
+				rawText: getMessageText(m),
 				date: m.date,
 				humanDate: formatDateWithTime(new Date(m.date * 1000)),
 				fromId: getPeerIdString(m.fromId),
@@ -1112,6 +1188,7 @@ async function getHistory(
 				isOutgoing: m.out,
 				direction: m.out ? 'sent' : 'received',
 				hasMedia,
+				hasWebPreview: mediaInfo.hasWebPreview,
 				mediaType: messageType,
 			},
 			pairedItem: { item: i },
@@ -1167,7 +1244,8 @@ async function unpinMessage(
 	const messageDate = detailedMessage?.date;
 	const replyToId = detailedMessage?.replyTo?.replyToMsgId || null;
 	const isOutgoing = detailedMessage?.out !== undefined ? detailedMessage.out : true;
-	const finalText = getMessageText(detailedMessage);
+	const finalRawText = getMessageText(detailedMessage);
+	const finalText = getRichMessageText(detailedMessage);
 	const fromId = getPeerIdString(detailedMessage?.fromId);
 
 	return [
@@ -1179,6 +1257,7 @@ async function unpinMessage(
 				sourceName,
 				sourceId: formattedSourceId,
 				text: finalText,
+				rawText: finalRawText,
 				date: messageDate,
 				humanDate: messageDate ? formatDateWithTime(new Date(messageDate * 1000)) : null,
 				fromId,
@@ -1187,6 +1266,7 @@ async function unpinMessage(
 				isOutgoing,
 				direction: isOutgoing ? 'sent' : 'received',
 				hasMedia: mediaInfo.hasMedia,
+				hasWebPreview: mediaInfo.hasWebPreview,
 				mediaType: getMessageType(detailedMessage),
 				unpinnedId: messageId,
 			},
@@ -1335,12 +1415,14 @@ async function copyMessage(
 				message: 'Message copied successfully',
 				copiedId: result.id,
 				originalId: originalMessage.id,
-				text: getMessageText(result),
+				text: getRichMessageText(result),
+				rawText: getMessageText(result),
 				chatId: toIdString(result.chatId),
 				fromId: senderId,
 				date: result.date,
 				hasMedia: !!mediaToSend, // Update status to reflect what was actually sent
-				caption: caption || messageContent,
+				caption: caption || getRichMessageText(originalMessage),
+				rawCaption: caption || getMessageText(originalMessage),
 			},
 			pairedItem: { item: i },
 		},
@@ -1349,26 +1431,42 @@ async function copyMessage(
 
 /**
  * Robust peer resolver to avoid "Could not find the input entity" errors when the client
- * has not cached a user/channel yet. We try getEntity first, then scan dialogs the client
- * can see, and finally rethrow the original error for clearer debugging.
+ * has not cached a user/channel yet. We try getInputEntity first, then search dialogs.
  */
 async function resolvePeer(client: TelegramClientInstance, rawId: unknown): Promise<unknown> {
 	const asString = typeof rawId === 'string' ? rawId.trim() : String(rawId);
 	if (!asString || asString.toLowerCase() === 'me') return 'me';
 
 	try {
-		return await getEntityLoose(client, asString);
+		return await client.getInputEntity(asString as never);
 	} catch (initialError) {
 		// Fallback: walk through dialogs to find a matching peer by id/username
-		for await (const dialog of iterDialogsLoose(client, { limit: 5000 })) {
-			const entity = dialog.entity || dialog;
-			const idMatch = toIdString(entity.id) === asString;
-			const usernameMatch =
-				typeof entity.username === 'string' &&
-				(`@${entity.username}`.toLowerCase() === asString.toLowerCase() ||
-					entity.username.toLowerCase() === asString.toLowerCase());
-			if (idMatch || usernameMatch) return entity;
+		try {
+			for await (const dialog of iterDialogsLoose(client, { limit: 5000 })) {
+				const entity = dialog.entity || dialog;
+				// check numeric match
+				const idMatch = toIdString((entity as TelegramEntityView).id) === asString;
+				const usernameMatch =
+					typeof (entity as TelegramEntityView).username === 'string' &&
+					(`@${(entity as TelegramEntityView).username}`.toLowerCase() === asString.toLowerCase() ||
+						(entity as TelegramEntityView).username!.toLowerCase() === asString.toLowerCase());
+
+				if (idMatch || usernameMatch) {
+					return await client.getInputEntity(entity as never);
+				}
+			}
+		} catch {
+			// Ignore iterDialogs errors
 		}
+
+		if (/^\d+$/.test(asString)) {
+			throw new Error(
+				`Telegram API requires an "access_hash" to send messages to users by numeric ID (like ${asString}). ` +
+					`Because this account hasn't interacted with this user recently, Telegram rejected the ID. ` +
+					`Please use their @username instead, or ensure the user sends a message to this account first.`,
+			);
+		}
+
 		throw initialError;
 	}
 }

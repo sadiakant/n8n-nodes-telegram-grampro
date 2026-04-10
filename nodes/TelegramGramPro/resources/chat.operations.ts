@@ -622,5 +622,5 @@ function formatDateWithTime(date: Date): string {
 	const hourStr = pad(hours);
 	const datePart = `${day}-${month}-${year}`;
 	const timePart = `${hourStr}:${minutes}:${seconds} ${ampm}`;
-	return `${datePart} (${timePart}) - IST`;
+	return `${datePart} (${timePart})`;
 }
