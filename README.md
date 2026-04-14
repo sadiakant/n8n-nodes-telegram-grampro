@@ -167,13 +167,15 @@ Trigger filters:
 
 Filter behavior:
 - `All Messages` is the default catch-all mode
+- `Only Channel Messages` matches broadcast channels only
+- `Only Group Messages` matches classic groups plus supergroups/gigagroups
 - `Selected Chats Only` matches chat or sender identifiers from a JSON array or comma-separated list
 - `Except Selected Chats Only` excludes matching chats or senders after the main include filter is applied
 - Numeric IDs are matched across equivalent forms such as `519...`, `-519...`, and `-100519...`
 - `Selected Chats Only` and the per-type include toggles are mutually exclusive in the UI to avoid hidden-value overwrite issues
 
 Trigger output is readable-only (`raw` removed) and includes:
-- `updateType`, `message`, `date` (ISO UTC), `editDate`, `chatName`, `chatId`, `senderName`, `senderId`, `messageId`
+- `updateType`, `message`, `date` (ISO UTC), `editDate`, `chatName`, `chatId`, `chatType`, `senderName`, `senderId`, `senderIsBot`, `messageId`
 - `isPrivate`, `isGroup`, `isChannel`, `isOutgoing`, `messageType` (`text`, `photo`, `video`, `document`, `other`)
 
 Binary output behavior:

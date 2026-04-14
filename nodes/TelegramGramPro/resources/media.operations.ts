@@ -2,14 +2,17 @@ import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
 import { getClient } from '../core/clientManager';
 import { safeExecute } from '../core/floodWaitHandler';
 import { Api } from 'telegram';
-import path from 'path';
 import type {
 	TelegramClientInstance,
 	TelegramCredentials,
-	TelegramEntityLike,
-	TelegramMediaLike,
-	TelegramMessageLike,
+	TelegramEntity,
 } from '../core/types';
+import {
+	buildSharedAlbumPayload,
+	buildSharedMessagePayload,
+	createSharedBinaryExecutionItem,
+	resolveMessageContextFromEntities,
+} from '../core/payloadBuilders';
 
 export async function mediaRouter(
 	this: IExecuteFunctions,
@@ -36,158 +39,58 @@ async function downloadMedia(
 	client: TelegramClientInstance,
 	i: number,
 ): Promise<INodeExecutionData[]> {
-	const chatId = this.getNodeParameter('chatId', i) as TelegramEntityLike;
-	const messageId = Number(this.getNodeParameter('messageId', i));
+	const chatIdInput = this.getNodeParameter('chatId', i) as string;
+	const messageIdInput = Number(this.getNodeParameter('messageId', i));
 
+	// 1. Resolve entity first to ensure client can fetch messages (handles non-cached entities)
+	const entity = await client.getEntity(chatIdInput);
+
+	// 2. Fetch the target message
 	const messages = (await safeExecute(() =>
-		client.getMessages(chatId, { ids: [messageId] }),
-	)) as TelegramMessageLike[];
+		client.getMessages(entity, { ids: [messageIdInput] }),
+	)) as Api.Message[];
 
-	const message = messages[0];
-	const media = message?.media as TelegramMediaLike;
-
-	if (!media) {
-		throw new Error('No media found in message');
+	const msg = messages?.[0];
+	if (!msg || msg instanceof Api.MessageEmpty) {
+		throw new Error('Message not found or contains no media');
 	}
 
-	const buffer = (await safeExecute(() => client.downloadMedia(media))) as Buffer | Uint8Array;
+	const chatEntity = entity as unknown as TelegramEntity;
 
-	const normalizedBuffer = ensureBuffer(buffer);
+	// 3. If it's part of an album, fetch the full album
+	let albumMessages = [msg];
+	const gid = msg.groupedId?.toString();
+	if (gid) {
+		// Fetch surrounding messages to find the rest of the album
+		// Albums are max 10 messages, so fetching 20 around it is safe.
+		const surrounding = (await safeExecute(() =>
+			client.getMessages(entity, {
+				limit: 20,
+				offsetId: messageIdInput + 10,
+			}),
+		)) as Api.Message[];
 
-	// Determine mime type and file name
-	let mimeType = 'application/octet-stream';
-	let fileName = `file_${Date.now()}`;
+		albumMessages = surrounding.filter((m) => m.groupedId?.toString() === gid);
+		// Ensure stable order (by ID)
+		albumMessages.sort((a, b) => a.id - b.id);
 
-	if ('document' in media && media.document instanceof Api.Document) {
-		mimeType = media.document.mimeType || mimeType;
-		const filenameAttr = media.document.attributes.find(
-			(attribute): attribute is Api.DocumentAttributeFilename =>
-				attribute instanceof Api.DocumentAttributeFilename,
-		);
-		if (filenameAttr) fileName = filenameAttr.fileName;
-	} else if ('photo' in media && media.photo) {
-		mimeType = 'image/jpeg';
-		fileName = `photo_${Date.now()}.jpg`;
-	}
-
-	fileName = ensureFileNameExtension(fileName, mimeType, normalizedBuffer);
-
-	return [
-		{
-			json: {
-				success: true,
-				fileName,
-				mimeType,
-				size: normalizedBuffer.length,
-			},
-			binary: {
-				data: {
-					data: normalizedBuffer.toString('base64'),
-					mimeType,
-					fileName,
-				},
-			},
-			pairedItem: { item: i },
-		},
-	];
-}
-
-function ensureBuffer(data: Buffer | Uint8Array): Buffer {
-	if (Buffer.isBuffer(data)) {
-		return data;
-	}
-
-	if (data instanceof Uint8Array) {
-		return Buffer.from(data);
-	}
-
-	throw new Error('Downloaded media is not in a supported binary format');
-}
-
-function ensureFileNameExtension(fileName: string, mimeType: string, buffer: Buffer): string {
-	if (path.extname(fileName)) {
-		return fileName;
-	}
-
-	const extension =
-		getExtensionFromMimeType(mimeType) ||
-		getExtensionFromMimeType(detectMimeTypeFromBuffer(buffer));
-	return extension ? `${fileName}${extension}` : fileName;
-}
-
-function getExtensionFromMimeType(mimeType: string | undefined): string {
-	if (!mimeType) {
-		return '';
-	}
-
-	const normalizedMime = mimeType.split(';')[0].trim().toLowerCase();
-	const knownExtensions: Record<string, string> = {
-		'application/gzip': '.gz',
-		'application/json': '.json',
-		'application/octet-stream': '',
-		'application/pdf': '.pdf',
-		'application/zip': '.zip',
-		'audio/mpeg': '.mp3',
-		'audio/ogg': '.ogg',
-		'image/gif': '.gif',
-		'image/jpeg': '.jpg',
-		'image/png': '.png',
-		'image/webp': '.webp',
-		'text/html': '.html',
-		'text/plain': '.txt',
-		'video/mp4': '.mp4',
-		'video/quicktime': '.mov',
-		'video/webm': '.webm',
-	};
-
-	return knownExtensions[normalizedMime] ?? '';
-}
-
-function detectMimeTypeFromBuffer(buffer: Buffer): string | undefined {
-	if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
-		return 'image/jpeg';
-	}
-
-	if (
-		buffer.length >= 8 &&
-		buffer[0] === 0x89 &&
-		buffer[1] === 0x50 &&
-		buffer[2] === 0x4e &&
-		buffer[3] === 0x47 &&
-		buffer[4] === 0x0d &&
-		buffer[5] === 0x0a &&
-		buffer[6] === 0x1a &&
-		buffer[7] === 0x0a
-	) {
-		return 'image/png';
-	}
-
-	if (buffer.length >= 6) {
-		const gifHeader = buffer.subarray(0, 6).toString('ascii');
-		if (gifHeader === 'GIF87a' || gifHeader === 'GIF89a') {
-			return 'image/gif';
+		// Fallback: if somehow filter failed to find the original msg (unlikely), ensure it's there
+		if (!albumMessages.find(m => m.id === msg.id)) {
+			albumMessages = [msg];
 		}
 	}
 
-	if (
-		buffer.length >= 12 &&
-		buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
-		buffer.subarray(8, 12).toString('ascii') === 'WEBP'
-	) {
-		return 'image/webp';
-	}
+	// 4. Resolve context for the payload
+	const senderEntity = (await msg.getSender?.()) as TelegramEntity;
+	const messageContext = resolveMessageContextFromEntities(msg, chatEntity, senderEntity);
 
-	if (buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-') {
-		return 'application/pdf';
-	}
+	// 5. Build the payload
+	const payload = gid
+		? buildSharedAlbumPayload(albumMessages, messageContext)
+		: buildSharedMessagePayload(msg, messageContext);
 
-	if (buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4b) {
-		return 'application/zip';
-	}
+	// 6. Download and create binary execution item
+	const item = await createSharedBinaryExecutionItem(this, albumMessages, payload, false);
 
-	if (buffer.length >= 12 && buffer.subarray(4, 8).toString('ascii') === 'ftyp') {
-		return 'video/mp4';
-	}
-
-	return undefined;
+	return [item];
 }

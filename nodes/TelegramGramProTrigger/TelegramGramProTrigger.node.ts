@@ -7,8 +7,10 @@ import type {
 } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 import { Api } from 'telegram';
+import { Album } from 'telegram/events/Album';
 import { EditedMessage } from 'telegram/events/EditedMessage';
 import { NewMessage } from 'telegram/events/NewMessage';
+import type { AlbumEvent } from 'telegram/events/Album';
 import type { EditedMessageEvent } from 'telegram/events/EditedMessage';
 import type { NewMessageEvent } from 'telegram/events/NewMessage';
 
@@ -18,8 +20,11 @@ import { logger } from '../TelegramGramPro/core/logger';
 import type { TelegramCredentials } from '../TelegramGramPro/core/types';
 import {
 	buildTriggerPayload,
+	buildAlbumTriggerPayload,
 	createDedupeTracker,
+	createAlbumDeduplicationKey,
 	createExecutionItem,
+	createAlbumExecutionItem,
 	createMessageDeduplicationKey,
 	parseTriggerConfig,
 	resolveMessageContext,
@@ -28,8 +33,8 @@ import {
 } from './trigger.shared';
 
 type RegisteredHandler = {
-	event: NewMessage | EditedMessage;
-	handler: (event: NewMessageEvent | EditedMessageEvent) => void;
+	event: NewMessage | EditedMessage | Album;
+	handler: (...args: unknown[]) => void;
 };
 
 export class TelegramGramProTrigger implements INodeType {
@@ -87,7 +92,8 @@ export class TelegramGramProTrigger implements INodeType {
 					{
 						name: 'Message',
 						value: 'message',
-						description: 'Trigger on new messages from private chats, groups, channels, or bots',
+						description:
+							'Trigger on new messages from private chats, bots, groups, supergroups, or channels',
 					},
 					{
 						name: 'Edited Message',
@@ -116,6 +122,14 @@ export class TelegramGramProTrigger implements INodeType {
 				],
 			},
 			{
+				displayName: 'Disable Binary',
+				name: 'disableBinary',
+				type: 'boolean',
+				default: true,
+				description:
+					'Whether to skip downloading media binaries and return only media metadata in JSON',
+			},
+			{
 				displayName: 'All Messages',
 				name: 'allMessages',
 				type: 'boolean',
@@ -128,7 +142,8 @@ export class TelegramGramProTrigger implements INodeType {
 						selectedChatsOnly: [false],
 					},
 				},
-				description: 'Whether to capture all messages from users, groups, channels, and bots',
+				description:
+					'Whether to capture all messages from users, bots, groups, supergroups, and channels',
 			},
 			{
 				displayName: 'Only User Messages',
@@ -152,7 +167,7 @@ export class TelegramGramProTrigger implements INodeType {
 						selectedChatsOnly: [true],
 					},
 				},
-				description: 'Whether to capture only channel messages or posts',
+				description: 'Whether to capture only broadcast channel messages or posts',
 			},
 			{
 				displayName: 'Only Group Messages',
@@ -164,7 +179,7 @@ export class TelegramGramProTrigger implements INodeType {
 						selectedChatsOnly: [true],
 					},
 				},
-				description: 'Whether to capture only group and supergroup messages',
+				description: 'Whether to capture only group, supergroup, and gigagroup messages',
 			},
 			{
 				displayName: 'Selected Chats Only',
@@ -231,7 +246,7 @@ export class TelegramGramProTrigger implements INodeType {
 			throw new NodeOperationError(this.getNode(), 'Telegram GramPro credentials are required.');
 		}
 
-		const config = parseTriggerConfig(this);
+		const config = parseTriggerConfig.call(this);
 		const client = await getClient(
 			credentials.apiId,
 			credentials.apiHash,
@@ -266,6 +281,21 @@ export class TelegramGramProTrigger implements INodeType {
 
 			client.addEventHandler(registration.handler, registration.event);
 			handlers.push(registration);
+
+			if (updateType === 'message') {
+				const albumRegistration = createAlbumRegistration(
+					async (items) => {
+						this.emit([items]);
+					},
+					this,
+					client,
+					config,
+					dedupe,
+				);
+
+				client.addEventHandler(albumRegistration.handler, albumRegistration.event);
+				handlers.push(albumRegistration);
+			}
 		}
 
 		logger.info('[TelegramGramProTrigger] Trigger activated', {
@@ -273,6 +303,7 @@ export class TelegramGramProTrigger implements INodeType {
 			updates: config.updates.join(','),
 			listeningMode: config.listeningMode.join(','),
 			allMessages: config.allMessages,
+			disableBinary: config.disableBinary,
 			exceptSelectedChatsOnly: config.exceptSelectedChatsOnly,
 			selectedChatsOnly: config.selectedChatsOnly,
 		});
@@ -330,6 +361,10 @@ function createRegistration(
 				return;
 			}
 
+			if (currentUpdateType === 'message' && message.groupedId) {
+				return;
+			}
+
 			const dedupeKey = createMessageDeduplicationKey(currentUpdateType, message);
 			if (!dedupe.shouldEmit(dedupeKey)) {
 				return;
@@ -341,7 +376,7 @@ function createRegistration(
 			}
 
 			const payload = buildTriggerPayload(currentUpdateType, message, messageContext);
-			const item = await createExecutionItem(context, message, payload);
+			const item = await createExecutionItem(context, message, payload, config.disableBinary);
 			await emit([item]);
 		} catch (error) {
 			logger.error('[TelegramGramProTrigger] Failed to process Telegram update', {
@@ -354,8 +389,8 @@ function createRegistration(
 
 	if (updateType === 'edited_message') {
 		const event = new EditedMessage({});
-		const handler = (eventData: EditedMessageEvent): void => {
-			void processEvent(eventData, 'edited_message');
+		const handler = (...args: unknown[]): void => {
+			void processEvent(args[0] as EditedMessageEvent, 'edited_message');
 		};
 
 		return {
@@ -365,14 +400,71 @@ function createRegistration(
 	}
 
 	const event = new NewMessage({});
-	const handler = (eventData: NewMessageEvent): void => {
-		void processEvent(eventData, 'message');
+	const handler = (...args: unknown[]): void => {
+		void processEvent(args[0] as NewMessageEvent, 'message');
 	};
 
 	return {
 		event,
 		handler,
 	};
+}
+
+function createAlbumRegistration(
+	emit: (items: INodeExecutionData[]) => Promise<void>,
+	context: ITriggerFunctions,
+	client: Awaited<ReturnType<typeof getClient>>,
+	config: ReturnType<typeof parseTriggerConfig>,
+	dedupe: ReturnType<typeof createDedupeTracker>,
+): RegisteredHandler {
+	const event = new Album({});
+	const handler = (...args: unknown[]): void => {
+		void processAlbumEvent(args[0] as AlbumEvent, emit, context, client, config, dedupe);
+	};
+
+	return {
+		event,
+		handler,
+	};
+}
+
+async function processAlbumEvent(
+	event: AlbumEvent,
+	emit: (items: INodeExecutionData[]) => Promise<void>,
+	context: ITriggerFunctions,
+	client: Awaited<ReturnType<typeof getClient>>,
+	config: ReturnType<typeof parseTriggerConfig>,
+	dedupe: ReturnType<typeof createDedupeTracker>,
+): Promise<void> {
+	try {
+		const messages = event.messages.filter(
+			(message): message is Api.Message => message instanceof Api.Message,
+		);
+		if (messages.length === 0) {
+			return;
+		}
+
+		const primaryMessage =
+			messages.find((message) => (message.message ?? message.text ?? '').trim()) ?? messages[0];
+		const dedupeKey = createAlbumDeduplicationKey('message', messages);
+		if (!dedupe.shouldEmit(dedupeKey)) {
+			return;
+		}
+
+		const messageContext = await resolveMessageContext(primaryMessage);
+		if (!shouldProcessMessage(primaryMessage, messageContext, config)) {
+			return;
+		}
+
+		const payload = buildAlbumTriggerPayload('message', messages, messageContext);
+		const item = await createAlbumExecutionItem(context, messages, payload, config.disableBinary);
+		await emit([item]);
+	} catch (error) {
+		logger.error('[TelegramGramProTrigger] Failed to process Telegram album update', {
+			error: getErrorMessage(error),
+			nodeName: context.getNode().name,
+		});
+	}
 }
 
 function getErrorMessage(error: unknown): string {

@@ -24,8 +24,8 @@ Supported updates:
 - **Listening Mode**: Capture `Incoming Messages`, `Outgoing Messages`, or both.
 - **All Messages**: Catch all supported updates unless a more specific include filter is enabled.
 - **Only User Messages**: Limit events to private user or bot chats.
-- **Only Channel Messages**: Limit events to channels.
-- **Only Group Messages**: Limit events to groups and supergroups.
+- **Only Channel Messages**: Limit events to broadcast channels only.
+- **Only Group Messages**: Limit events to classic groups, supergroups, and gigagroups.
 - **Selected Chats Only**: Match only selected chats/senders from a JSON array or comma-separated list.
 - **Except Selected Chats Only**: Exclude selected chats/senders after the main include filter is applied.
 
@@ -49,8 +49,10 @@ The trigger payload now emits:
 - `editDate`
 - `chatName`
 - `chatId`
+- `chatType`
 - `senderName`
 - `senderId`
+- `senderIsBot`
 - `messageId`
 - `isPrivate`
 - `isGroup`

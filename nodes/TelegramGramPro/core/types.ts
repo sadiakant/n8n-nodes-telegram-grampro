@@ -29,14 +29,18 @@ export type TelegramLoggerContext = LogMetadata | Error | TelegramUnknownRecord 
 
 export interface TelegramTriggerPayload extends IDataObject {
 	updateType?: 'message' | 'edited_message';
+	groupedId?: string;
+	mediaCount?: number;
 	message?: string;
 	rawMessage?: string;
 	date?: string | null;
 	editDate?: string | null;
 	chatName?: string | null;
 	chatId?: string | null;
+	chatType?: TelegramTriggerChatType;
 	senderName?: string | null;
 	senderId?: string | null;
+	senderIsBot?: boolean | null;
 	messageId?: string;
 	isPrivate?: boolean;
 	isGroup?: boolean;
@@ -44,10 +48,26 @@ export interface TelegramTriggerPayload extends IDataObject {
 	isOutgoing?: boolean;
 	messageType?: 'text' | 'photo' | 'video' | 'document' | 'other';
 	hasMedia?: boolean;
+	disableBinary?: boolean;
+	fileName?: string;
+	fileExtension?: string;
+	mimeType?: string;
+	size?: string; // Human-readable file size (e.g., "125KB", "1.2GB")
+	bytes?: number; // Numeric file size in bytes (e.g., 125000, 1200000000)
+	binaryBase64?: string;
+	mediaFiles?: IDataObject[];
 	hasWebPreview?: boolean;
 	mediaDownloadError?: string;
 	raw?: IDataObject;
 }
+
+export type TelegramTriggerChatType =
+	| 'user'
+	| 'bot'
+	| 'group'
+	| 'supergroup'
+	| 'channel'
+	| 'unknown';
 
 export interface TelegramTriggerHandlerRegistration {
 	handler: (event: NewMessageEvent) => Promise<void>;
@@ -108,7 +128,8 @@ export interface TelegramMedia {
 	type: 'photo' | 'video' | 'document' | 'audio' | 'sticker';
 	fileName?: string;
 	mimeType?: string;
-	size?: number;
+	size?: string; // Human-readable file size (e.g., "125KB", "1.2GB")
+	bytes?: number; // Numeric file size in bytes (e.g., 125000, 1200000000)
 	width?: number;
 	height?: number;
 	duration?: number;

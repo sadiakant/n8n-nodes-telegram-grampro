@@ -8,7 +8,12 @@ import { CustomFile } from 'telegram/client/uploads';
 
 import { logger } from '../core/logger';
 import { prepareTelegramTextInput, renderTelegramEntities } from '../core/messageFormatting';
-import type { TelegramClientInstance, TelegramCredentials } from '../core/types';
+import type { TelegramClientInstance, TelegramCredentials, TelegramEntity } from '../core/types';
+import {
+	buildSharedAlbumPayload,
+	buildSharedMessagePayload,
+	resolveMessageContextFromEntities,
+} from '../core/payloadBuilders';
 
 type Stringable = { toString: () => string } | string | number | bigint;
 
@@ -113,6 +118,8 @@ type TelegramMessageView = {
 	replyTo?: {
 		replyToMsgId?: number;
 	};
+	replyToMsgId?: number;
+	groupedId?: Stringable;
 	post_author?: string;
 	chatId?: Stringable;
 	_?: string;
@@ -1108,25 +1115,17 @@ async function getHistory(
 		}
 	}
 
-	let sourceName = 'Unknown';
-	let formattedSourceId = chatIdInput;
 
-	try {
-		const entity = await getEntityLoose(client, chatIdInput);
-		if (entity) {
-			sourceName = getEntityLabel(entity);
-			formattedSourceId = getFormattedEntityId(entity, formattedSourceId);
-		}
-	} catch {
-		/* intentionally ignoring */
-	}
 
 	let messages: TelegramMessageView[] = [];
 
+	let requestedLimit = 50;
 	if (mode === 'limit') {
-		const limit = this.getNodeParameter('limit', i, 10) as number;
+		requestedLimit = this.getNodeParameter('limit', i, 10) as number;
+		// Fetch a bit more than requested to account for albuminous grouping (max 10 messages per album)
+		const fetchLimit = requestedLimit + 10;
 		const result = await safeExecute(() =>
-			getMessagesLoose(client, chatIdInput, { limit, replyTo: replyToMsgId }),
+			getMessagesLoose(client, chatIdInput, { limit: fetchLimit, replyTo: replyToMsgId }),
 		);
 		messages = Array.isArray(result) ? result : [];
 	} else {
@@ -1159,11 +1158,56 @@ async function getHistory(
 	}
 
 	const items = [];
+	const chatEntity = (await getEntityLoose(client, chatIdInput)) as TelegramEntity;
+
+	// Group messages by groupedId to support albums in history
+	const groups = new Map<string, TelegramMessageView[]>();
+	const orderedGroups: Array<{ type: 'single' | 'album'; messages: TelegramMessageView[] }> = [];
+
 	for (const m of messages) {
 		if (!m || m._ === 'MessageEmpty') continue;
 
-		const mediaInfo = extractMediaInfo(m.media);
-		const messageType = getMessageType(m);
+		const gid = m.groupedId?.toString();
+		if (gid) {
+			if (!groups.has(gid)) {
+				const group: TelegramMessageView[] = [];
+				groups.set(gid, group);
+				orderedGroups.push({ type: 'album', messages: group });
+			}
+			groups.get(gid)!.push(m);
+		} else {
+			orderedGroups.push({ type: 'single', messages: [m] });
+		}
+	}
+
+	// Batch fetch sender entities for better names (esp. in groups)
+	const senderIdSet = new Set<string>();
+	for (const m of messages) {
+		const sid = (m as unknown as Api.Message).senderId?.toString();
+		if (sid) senderIdSet.add(sid);
+	}
+	const senderEntities = new Map<string, TelegramEntity>();
+	if (senderIdSet.size > 0) {
+		try {
+			// getEntity with an array returns an array of entities
+			const entities = (await client.getEntity(Array.from(senderIdSet))) as TelegramEntity[];
+			for (const ent of entities) {
+				const id = ent.id?.toString();
+				if (id) senderEntities.set(id, ent);
+			}
+		} catch (err) {
+			logger.warn('Failed to batch fetch sender entities for history: ' + (err as Error).message);
+		}
+	}
+
+	for (const group of orderedGroups) {
+		const primaryMessage = group.messages[0];
+		const messageObj = primaryMessage as unknown as Api.Message;
+		const senderId = messageObj.senderId?.toString();
+		const senderEntity = senderId ? senderEntities.get(senderId) : undefined;
+
+		const mediaInfo = extractMediaInfo(primaryMessage.media);
+		const messageType = getMessageType(primaryMessage);
 		const hasMedia = mediaInfo.hasMedia;
 		const wantsNonMediaMessages = mediaTypes.includes('text') || mediaTypes.includes('other');
 
@@ -1173,29 +1217,26 @@ async function getHistory(
 			continue;
 		}
 
+		// Resolve context from entities
+		const messageContext = resolveMessageContextFromEntities(messageObj, chatEntity, senderEntity);
+
+		let payload;
+		if (group.type === 'album') {
+			payload = buildSharedAlbumPayload(group.messages as unknown as Api.Message[], messageContext);
+		} else {
+			payload = buildSharedMessagePayload(messageObj, messageContext);
+		}
+
 		items.push({
 			json: {
-				id: m.id,
-				sourceName: sourceName,
-				sourceId: formattedSourceId,
-				text: getRichMessageText(m),
-				rawText: getMessageText(m),
-				date: m.date,
-				humanDate: formatDateWithTime(new Date(m.date * 1000)),
-				fromId: getPeerIdString(m.fromId),
-				chatId: getPeerIdString(m.peerId),
-				isReply: !!m.replyTo,
-				isOutgoing: m.out,
-				direction: m.out ? 'sent' : 'received',
-				hasMedia,
-				hasWebPreview: mediaInfo.hasWebPreview,
-				mediaType: messageType,
+				...payload,
+				humanDate: formatDateWithTime(new Date(primaryMessage.date * 1000)),
 			},
 			pairedItem: { item: i },
 		});
 	}
 
-	return items;
+	return items.slice(0, requestedLimit);
 }
 
 async function unpinMessage(
@@ -1462,8 +1503,8 @@ async function resolvePeer(client: TelegramClientInstance, rawId: unknown): Prom
 		if (/^\d+$/.test(asString)) {
 			throw new Error(
 				`Telegram API requires an "access_hash" to send messages to users by numeric ID (like ${asString}). ` +
-					`Because this account hasn't interacted with this user recently, Telegram rejected the ID. ` +
-					`Please use their @username instead, or ensure the user sends a message to this account first.`,
+				`Because this account hasn't interacted with this user recently, Telegram rejected the ID. ` +
+				`Please use their @username instead, or ensure the user sends a message to this account first.`,
 			);
 		}
 

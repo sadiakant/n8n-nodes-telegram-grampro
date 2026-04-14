@@ -35,6 +35,7 @@ Check `Listening Mode`. Telegram user accounts receive both incoming and outgoin
 Check these points:
 
 - `All Messages` must be enabled, or the matching include filter must be enabled (`Only Channel Messages`, `Only Group Messages`, or `Selected Chats Only`)
+- `Only Channel Messages` is for broadcast channels, while `Only Group Messages` is for groups/supergroups
 - Your `Trigger On` selection must include the relevant update type
 - Your selected/excluded chat lists must match the actual channel or sender identifiers
 
