@@ -1,13 +1,7 @@
-import {
-	ITriggerFunctions,
-	NodeParameterValueType,
-	INodeExecutionData,
-} from 'n8n-workflow';
+import { ITriggerFunctions, NodeParameterValueType, INodeExecutionData } from 'n8n-workflow';
 import { Api } from 'telegram';
 
-import {
-	TelegramTriggerPayload,
-} from '../TelegramGramPro/core/types';
+import { TelegramTriggerPayload } from '../TelegramGramPro/core/types';
 import {
 	buildTriggerPayload as buildTriggerPayloadShared,
 	buildAlbumTriggerPayload as buildAlbumTriggerPayloadShared,
@@ -64,10 +58,7 @@ export function parseTriggerConfig(this: ITriggerFunctions): TriggerConfig {
 
 	let exceptSelectedChats: string[] = [];
 	if (exceptSelectedChatsOnly) {
-		exceptSelectedChats = parseChatList(
-			this,
-			this.getNodeParameter('exceptSelectedChats', ''),
-		);
+		exceptSelectedChats = parseChatList(this, this.getNodeParameter('exceptSelectedChats', ''));
 	}
 
 	return {
@@ -260,7 +251,10 @@ function parseChatList(
 
 		if (!Array.isArray(parsed)) {
 			// Try comma separated
-			const parts = String(rawChatList).split(',').map(s => s.trim()).filter(Boolean);
+			const parts = String(rawChatList)
+				.split(',')
+				.map((s) => s.trim())
+				.filter(Boolean);
 			return normalizeChatEntries(parts);
 		}
 

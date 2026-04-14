@@ -1115,8 +1115,6 @@ async function getHistory(
 		}
 	}
 
-
-
 	let messages: TelegramMessageView[] = [];
 
 	let requestedLimit = 50;
@@ -1503,8 +1501,8 @@ async function resolvePeer(client: TelegramClientInstance, rawId: unknown): Prom
 		if (/^\d+$/.test(asString)) {
 			throw new Error(
 				`Telegram API requires an "access_hash" to send messages to users by numeric ID (like ${asString}). ` +
-				`Because this account hasn't interacted with this user recently, Telegram rejected the ID. ` +
-				`Please use their @username instead, or ensure the user sends a message to this account first.`,
+					`Because this account hasn't interacted with this user recently, Telegram rejected the ID. ` +
+					`Please use their @username instead, or ensure the user sends a message to this account first.`,
 			);
 		}
 

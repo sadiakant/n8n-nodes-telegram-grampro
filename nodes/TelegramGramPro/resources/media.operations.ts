@@ -2,11 +2,7 @@ import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
 import { getClient } from '../core/clientManager';
 import { safeExecute } from '../core/floodWaitHandler';
 import { Api } from 'telegram';
-import type {
-	TelegramClientInstance,
-	TelegramCredentials,
-	TelegramEntity,
-} from '../core/types';
+import type { TelegramClientInstance, TelegramCredentials, TelegramEntity } from '../core/types';
 import {
 	buildSharedAlbumPayload,
 	buildSharedMessagePayload,
@@ -75,7 +71,7 @@ async function downloadMedia(
 		albumMessages.sort((a, b) => a.id - b.id);
 
 		// Fallback: if somehow filter failed to find the original msg (unlikely), ensure it's there
-		if (!albumMessages.find(m => m.id === msg.id)) {
+		if (!albumMessages.find((m) => m.id === msg.id)) {
 			albumMessages = [msg];
 		}
 	}
