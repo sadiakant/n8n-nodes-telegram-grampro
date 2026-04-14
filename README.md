@@ -421,7 +421,7 @@ MIT License - see LICENSE file for details.
 <br>
 
 <a href="https://github.com/sadiakant/n8n-nodes-telegram-grampro/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=sadiakant/n8n-nodes-telegram-grampro" />
+  <img src="https://stg.contrib.rocks/image?repo=sadiakant/n8n-nodes-telegram-grampro" />
 </a>
 
 Made with [contrib.rocks](https://contrib.rocks).
