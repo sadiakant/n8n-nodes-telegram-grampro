@@ -230,6 +230,90 @@ function getFormattedEntityId(
 	return rawId;
 }
 
+function isResolvablePeerObject(value: unknown): boolean {
+	return typeof value === 'object' && value !== null;
+}
+
+function normalizePeerReference(rawId: unknown): string | unknown {
+	if (typeof rawId !== 'string') {
+		return rawId;
+	}
+
+	let normalized = rawId.trim();
+	if (!normalized) {
+		return normalized;
+	}
+
+	const topicMatch = normalized.match(
+		/(?:https?:\/\/)?t\.me\/(?:c\/)?([a-zA-Z0-9_-]+)(?:\/\d+)?\/?$/i,
+	);
+	if (topicMatch) {
+		normalized = topicMatch[1];
+	}
+
+	if (/^\d+$/.test(normalized)) {
+		return normalized;
+	}
+
+	return normalized;
+}
+
+function getInputReferenceAliases(rawId: string): string[] {
+	const trimmed = rawId.trim();
+	if (!trimmed) {
+		return [];
+	}
+
+	const aliases = new Set<string>([trimmed]);
+
+	if (trimmed.startsWith('@')) {
+		aliases.add(trimmed.slice(1));
+	} else if (/^[a-zA-Z][a-zA-Z0-9_]{2,}$/.test(trimmed)) {
+		aliases.add(`@${trimmed}`);
+	}
+
+	if (/^-100\d+$/.test(trimmed)) {
+		aliases.add(trimmed.slice(4));
+	} else if (/^-\d+$/.test(trimmed)) {
+		aliases.add(trimmed.slice(1));
+	} else if (/^\d+$/.test(trimmed)) {
+		aliases.add(`-${trimmed}`);
+		aliases.add(`-100${trimmed}`);
+	}
+
+	return Array.from(aliases);
+}
+
+function getEntityReferenceAliases(entity: TelegramEntityView): Set<string> {
+	const aliases = new Set<string>();
+	const rawId = toIdString(entity.id);
+	if (rawId) {
+		aliases.add(rawId);
+		if (entity.className === 'Channel' || entity._ === 'channel') {
+			aliases.add(`-100${rawId}`);
+		}
+		if (entity.className === 'Chat' || entity._ === 'chat') {
+			aliases.add(`-${rawId}`);
+		}
+	}
+
+	if (typeof entity.username === 'string' && entity.username.trim()) {
+		aliases.add(entity.username.trim().toLowerCase());
+		aliases.add(`@${entity.username.trim().toLowerCase()}`);
+	}
+
+	return aliases;
+}
+
+function matchesEntityReference(entity: TelegramEntityView, rawReference: string): boolean {
+	const inputAliases = getInputReferenceAliases(rawReference).map((candidate) =>
+		candidate.toLowerCase(),
+	);
+	const entityAliases = getEntityReferenceAliases(entity);
+
+	return inputAliases.some((candidate) => entityAliases.has(candidate));
+}
+
 async function editMessageLoose(
 	client: TelegramClientInstance,
 	chatId: unknown,
@@ -246,8 +330,9 @@ async function getMessagesLoose(
 	peer: unknown,
 	params: Record<string, unknown>,
 ): Promise<TelegramMessageView[]> {
+	const resolvedPeer = await resolvePeer(client, peer);
 	return (await client.getMessages(
-		peer as never,
+		resolvedPeer as never,
 		params as never,
 	)) as unknown as TelegramMessageView[];
 }
@@ -256,7 +341,8 @@ async function getEntityLoose(
 	client: TelegramClientInstance,
 	peer: unknown,
 ): Promise<TelegramEntityView> {
-	return (await client.getEntity(peer as never)) as unknown as TelegramEntityView;
+	const resolvedPeer = await resolvePeer(client, peer);
+	return (await client.getEntity(resolvedPeer as never)) as unknown as TelegramEntityView;
 }
 
 async function sendMessageLoose(
@@ -275,19 +361,30 @@ async function forwardMessagesLoose(
 	peer: unknown,
 	params: Record<string, unknown>,
 ): Promise<TelegramMessageView> {
-	const result = (await client.forwardMessages(peer as never, params as never)) as unknown;
+	const resolvedPeer = await resolvePeer(client, peer);
+	const resolvedParams = { ...params };
+	if ('fromPeer' in resolvedParams) {
+		resolvedParams.fromPeer = await resolvePeer(
+			client,
+			(resolvedParams as { fromPeer?: unknown }).fromPeer,
+		);
+	}
+	const result = (await client.forwardMessages(
+		resolvedPeer as never,
+		resolvedParams as never,
+	)) as unknown;
 	return (Array.isArray(result) ? result[0] : result) as TelegramMessageView;
 }
 
-function iterMessagesLoose(
+async function* iterMessagesLoose(
 	client: TelegramClientInstance,
 	peer: unknown,
 	params: Record<string, unknown>,
 ): AsyncIterable<TelegramMessageView> {
-	return client.iterMessages(
-		peer as never,
-		params as never,
-	) as unknown as AsyncIterable<TelegramMessageView>;
+	const resolvedPeer = await resolvePeer(client, peer);
+	for await (const message of client.iterMessages(resolvedPeer as never, params as never) as unknown as AsyncIterable<TelegramMessageView>) {
+		yield message;
+	}
 }
 
 type DialogView = {
@@ -605,13 +702,13 @@ async function deleteHistory(
 			await client.connect();
 		}
 
-		const peer = await client.getInputEntity(chatId);
+		const peer = await resolvePeer(client, chatId);
 
 		// 1. GET TOTAL COUNT BEFORE DELETION
 		let preDeleteCount = 0;
 		try {
 			// 'limit: 0' fetches metadata (including total count) without fetching message bodies
-			const countResult = (await client.getMessages(peer, { limit: 0 } as never)) as unknown as {
+			const countResult = (await client.getMessages(peer as never, { limit: 0 } as never)) as unknown as {
 				total?: number;
 			};
 			preDeleteCount = countResult.total || 0;
@@ -627,7 +724,7 @@ async function deleteHistory(
 		do {
 			response = (await client.invoke(
 				new Api.messages.DeleteHistory({
-					peer: peer,
+					peer: peer as never,
 					maxId: maxId,
 					revoke: revoke,
 					justClear: false,
@@ -1399,6 +1496,10 @@ async function copyMessage(
 	const caption = this.getNodeParameter('caption', i, '') as string;
 	const disableLinkPreview = this.getNodeParameter('disableLinkPreview', i, false) as boolean;
 
+	logger.info(
+		`Copy Message start: source=${String(sourceChatId)} messageId=${messageId} target=${String(targetChatId)}`,
+	);
+
 	const fromPeer = await resolvePeer(client, sourceChatId);
 	const toPeer = saveToSavedMessages ? 'me' : await resolvePeer(client, targetChatId);
 
@@ -1434,6 +1535,10 @@ async function copyMessage(
 				formattingEntities: originalMessage.entities || [],
 			}),
 		),
+	);
+
+	logger.info(
+		`Copy Message success: source=${String(sourceChatId)} messageId=${messageId} copiedId=${result.id}`,
 	);
 
 	let senderId: string | null = getPeerIdString(result.fromId);
@@ -1473,41 +1578,47 @@ async function copyMessage(
  * has not cached a user/channel yet. We try getInputEntity first, then search dialogs.
  */
 async function resolvePeer(client: TelegramClientInstance, rawId: unknown): Promise<unknown> {
-	const asString = typeof rawId === 'string' ? rawId.trim() : String(rawId);
+	if (isResolvablePeerObject(rawId)) {
+		return rawId;
+	}
+
+	const normalizedRawId = normalizePeerReference(rawId);
+	const asString =
+		typeof normalizedRawId === 'string' ? normalizedRawId.trim() : String(normalizedRawId);
 	if (!asString || asString.toLowerCase() === 'me') return 'me';
 
-	try {
-		return await client.getInputEntity(asString as never);
-	} catch (initialError) {
-		// Fallback: walk through dialogs to find a matching peer by id/username
+	const candidates = getInputReferenceAliases(asString);
+
+	let initialError: unknown;
+	for (const candidate of candidates) {
 		try {
-			for await (const dialog of iterDialogsLoose(client, { limit: 5000 })) {
-				const entity = dialog.entity || dialog;
-				// check numeric match
-				const idMatch = toIdString((entity as TelegramEntityView).id) === asString;
-				const usernameMatch =
-					typeof (entity as TelegramEntityView).username === 'string' &&
-					(`@${(entity as TelegramEntityView).username}`.toLowerCase() === asString.toLowerCase() ||
-						(entity as TelegramEntityView).username!.toLowerCase() === asString.toLowerCase());
-
-				if (idMatch || usernameMatch) {
-					return await client.getInputEntity(entity as never);
-				}
-			}
-		} catch {
-			// Ignore iterDialogs errors
+			return await client.getInputEntity(candidate as never);
+		} catch (error) {
+			initialError = error;
 		}
-
-		if (/^\d+$/.test(asString)) {
-			throw new Error(
-				`Telegram API requires an "access_hash" to send messages to users by numeric ID (like ${asString}). ` +
-					`Because this account hasn't interacted with this user recently, Telegram rejected the ID. ` +
-					`Please use their @username instead, or ensure the user sends a message to this account first.`,
-			);
-		}
-
-		throw initialError;
 	}
+
+	try {
+		// Fallback: walk through dialogs to find a matching peer by id/username
+		for await (const dialog of iterDialogsLoose(client, { limit: 5000 })) {
+			const entity = (dialog.entity || dialog) as TelegramEntityView;
+			if (matchesEntityReference(entity, asString)) {
+				return await client.getInputEntity(entity as never);
+			}
+		}
+	} catch {
+		// Ignore iterDialogs errors
+	}
+
+	if (/^\d+$/.test(asString)) {
+		throw new Error(
+			`Could not resolve Telegram entity for numeric ID ${asString}. ` +
+				`If this is a channel/group from a previous node, pass its full chat ID (for example -100${asString}) or make sure it appears in this account's dialog list. ` +
+				`If this is a user, Telegram also requires a cached access hash, so use their @username or interact with them first.`,
+		);
+	}
+
+	throw (initialError as Error) || new Error(`Could not resolve Telegram entity: ${asString}`);
 }
 
 async function copyRestrictedContent(

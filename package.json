@@ -28,7 +28,7 @@
 	"scripts": {
 		"build": "n8n-node build",
 		"build:watch": "tsc --watch",
-		"dev": "n8n-node dev",
+		"dev": "n8n-node dev --external-n8n",
 		"format": "prettier credentials nodes/TelegramGramPro nodes/TelegramGramProTrigger --write",
 		"lint": "n8n-node lint",
 		"lint:fix": "n8n-node lint --fix",
@@ -53,11 +53,11 @@
 		"telegram": "^2.26.22"
 	},
 	"devDependencies": {
-		"@n8n/node-cli": "*",
-		"eslint": "^9.39.4",
-		"prettier": "^3.8.2",
-		"release-it": "^19.2.4",
-		"typescript": "^5.9.3"
+		"@n8n/node-cli": "^0.27.0",
+		"eslint": "9.39.4",
+		"prettier": "3.8.1",
+		"release-it": "^20.0.0",
+		"typescript": "5.9.3"
 	},
 	"peerDependencies": {
 		"n8n-workflow": "*"

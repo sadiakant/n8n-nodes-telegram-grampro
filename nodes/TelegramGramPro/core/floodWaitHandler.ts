@@ -111,18 +111,17 @@ export async function safeExecute<T>(fn: () => Promise<T>): Promise<T> {
 				throw new Error(mappedError.userMessage, { cause: err });
 			}
 
-			// Handle generic errors with retry logic
-			if (retryCount <= maxRetries) {
+			// Unknown/non-retryable errors should fail fast instead of silently stalling loops.
+			if (mappedError.retryable && retryCount <= maxRetries) {
 				const delay = baseDelay * Math.pow(2, retryCount - 1); // Exponential backoff
 				logger.warn(
-					`Generic error: retrying in ${delay}ms (retry ${retryCount}/${maxRetries}) - Error: ${error.message}`,
+					`Retryable error: retrying in ${delay}ms (retry ${retryCount}/${maxRetries}) - Error: ${error.message}`,
 				);
 				await new Promise((r) => setTimeout(r, delay));
 				continue;
 			}
 
-			// If we've exhausted all retries or it's an unrecoverable error
-			logger.error(`Failed after ${retryCount} retries: ${mappedError.userMessage}`);
+			logger.error(`Failed without retry: ${mappedError.userMessage}`);
 			throw new Error(mappedError.userMessage, { cause: err });
 		}
 	}

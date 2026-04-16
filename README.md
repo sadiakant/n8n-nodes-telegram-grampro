@@ -105,28 +105,12 @@ In n8n → Settings → Credentials:
 - **API ID**: Your Telegram API ID
 - **API Hash**: Your Telegram API hash
 - **Session String**: Your encrypted session string
-- **Mobile Number**: Your Telegram mobile number with country code (e.g., +1234567890)
 - **Validation**: Save/Test performs real MTProto getMe verification.
-- **UI Note**: n8n may still show the generic label Connection tested successfully on the global credentials page.
 
 ## 🎯 Comprehensive Operations Guide
 
 For detailed documentation of all operations with parameters, examples, and use cases, see our [Operations Guide](./docs/OPERATIONS_GUIDE.md).
 
-## Latest Release Highlights
-
-This release finalizes the GramPro user-account trigger and aligns media handling across the node.
-
-- New `Telegram GramPro Trigger` for Telegram user accounts using a persistent MTProto listener
-- Published workflow support for `Message` and `Edited Message` trigger events
-- `Listening Mode` multi-select with `Incoming Messages` and `Outgoing Messages`
-- Trigger filters: `All Messages`, `Only User Messages`, `Only Channel Messages`, `Only Group Messages`, `Selected Chats Only`, `Except Selected Chats Only`
-- Selected/excluded chat matching by username, title, sender name, sender ID, chat ID, and equivalent numeric aliases
-- Auto binary download in trigger output for `photo`, `video`, and `document`
-- Improved trigger cleanup and shared client reuse to prevent stale MTProto timeout logs
-- `Media Type` support aligned to `text`, `photo`, `video`, `document`, `other`
-- `Send Message` now treats `mediaType = text` as plain text without requiring binary data
-- `Get Chat History` can filter by the same trigger-compatible message/media types
 
 ## 🔧 Available Operations
 
@@ -138,49 +122,6 @@ This release finalizes the GramPro user-account trigger and aligns media handlin
 | **User**              | Get My Profile, Get Profiles Photo, Update My Profile, Update My Username, Get User Profile (Bio & Common Chats) |
 | **Media**             | Download Media Files                                                                                        |
 | **Channel**           | Add Member, Remove Member, Ban User, Unban User, Promote to Admin, Get Members                              |
-
-## Trigger Improvements
-
-Telegram GramPro now provides one MTProto trigger node:
-
-- `Telegram GramPro Trigger` (`telegramGramProTrigger`)
-
-Unlike the official n8n Telegram bot trigger, Telegram user accounts cannot register Bot API webhooks. GramPro keeps a live MTProto session connected while the workflow is active.
-
-Supported updates:
-
-- `Message`
-- `Edited Message`
-
-Listening mode:
-- `Incoming Messages`
-- `Outgoing Messages`
-- Selecting both listens to both directions
-
-Trigger filters:
-- `All Messages`
-- `Only User Messages`
-- `Only Channel Messages`
-- `Only Group Messages`
-- `Selected Chats Only`
-- `Except Selected Chats Only`
-
-Filter behavior:
-- `All Messages` is the default catch-all mode
-- `Only Channel Messages` matches broadcast channels only
-- `Only Group Messages` matches classic groups plus supergroups/gigagroups
-- `Selected Chats Only` matches chat or sender identifiers from a JSON array or comma-separated list
-- `Except Selected Chats Only` excludes matching chats or senders after the main include filter is applied
-- Numeric IDs are matched across equivalent forms such as `519...`, `-519...`, and `-100519...`
-- `Selected Chats Only` and the per-type include toggles are mutually exclusive in the UI to avoid hidden-value overwrite issues
-
-Trigger output is readable-only (`raw` removed) and includes:
-- `updateType`, `message`, `date` (ISO UTC), `editDate`, `chatName`, `chatId`, `chatType`, `senderName`, `senderId`, `senderIsBot`, `messageId`
-- `isPrivate`, `isGroup`, `isChannel`, `isOutgoing`, `messageType` (`text`, `photo`, `video`, `document`, `other`)
-
-Binary output behavior:
-- For `photo`, `video`, and `document`, media is attached in `binary.data`
-- If media download fails, JSON is still emitted with `mediaDownloadError`
 
 ## 🛡️ Security Features
 
@@ -294,6 +235,7 @@ n8n-nodes-telegram-grampro/
 │
 ├── 📚 docs/
 │   ├── AUTHORIZATION_GUIDE.md
+│   ├── CHANGE_LOG.md
 │   ├── OPERATIONS_GUIDE.md
 │   └── TROUBLESHOOTING_GUIDE.md
 │
@@ -302,11 +244,13 @@ n8n-nodes-telegram-grampro/
     │   ├── TelegramGramPro.node.ts
     │   ├── telegram-grampro.svg
     │   ├── core/
-    │   │   ├── cache.ts, clientManager.ts, floodWaitHandler.ts
-    │   │   ├── logger.ts, operationHelpers.ts, qrPng.ts
-    │   │   ├── rateLimiter.ts, sessionEncryption.ts
-    │   │   ├── telegramErrorMapper.ts, validation.ts
-    │   │   └── types.ts, messageFormatting.ts
+    │   │   ├── cache.ts, clientManager.ts, fileSizeUtils.ts, 
+    │   │   ├── floodWaitHandler.ts, logger.ts,  
+    │   │   ├── messageFormatting.ts, operationHelpers.ts,
+    │   │   ├── payloadBuilders.ts, qrPng.ts, 
+    │   │   ├── rateLimiter.ts, sessionEncryption.ts,
+    │   │   └── telegramErrorMapper.ts, types.ts, validation.ts
+    │   │
     │   └── resources/
     │       ├── authentication.operations.ts
     │       ├── channel.operations.ts
@@ -360,44 +304,11 @@ Ready-to-import workflow examples are available in [`docs/Workflows-Examples`](.
 
 ## 🤝 Contributing
 
-We welcome contributions to make Telegram GramPro even better!
-
-### **Contribution Guidelines**
-
-1. **Fork the repository**
-2. **Create a feature branch**
-3. **Make your changes with proper TypeScript types**
-4. **Add tests for new functionality**
-5. **Update documentation**
-6. **Submit a pull request**
-
-### **Development Setup**
-
-```bash
-# Clone the repository
-git clone https://github.com/sadiakant/n8n-nodes-telegram-grampro.git
-
-# Install dependencies
-npm install
-
-# Start development mode
-npm run dev
-
-# Build for production
-npm run build
-```
-
-### **Code Standards**
-
-- Use TypeScript for type safety
-- Follow existing code patterns
-- Add comprehensive error handling
-- Include proper documentation
-- Test thoroughly before submitting
+We welcome contributions to make Telegram GramPro even better! For comprehensive contributions guidance, see our [Contributions Guide](./docs/CONTRIBUTING.md).
 
 ## 📄 License
 
-MIT License - see LICENSE file for details.
+[MIT License](./LICENSE) - see LICENSE file for details.
 
 ## 🔗 Resources
 
@@ -428,16 +339,25 @@ Made with [contrib.rocks](https://contrib.rocks).
 
 </div>
 
----
+## ⭐ Star History
 
-### **Publishing Status**
+<a href="https://www.star-history.com/?repos=sadiakant%2Fn8n-nodes-telegram-grampro&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=sadiakant/n8n-nodes-telegram-grampro&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=sadiakant/n8n-nodes-telegram-grampro&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=sadiakant/n8n-nodes-telegram-grampro&type=date&legend=top-left" />
+ </picture>
+</a>
+
+## **Publishing Status**
+
 [![Build Status](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/build.yml/badge.svg)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/build.yml)
 [![Publish Status](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/publish.yml/badge.svg)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/actions/workflows/publish.yml)
 [![Socket Badge](https://badge.socket.dev/npm/package/n8n-nodes-telegram-grampro)](https://badge.socket.dev/npm/package/n8n-nodes-telegram-grampro)
 [![GitHub Issues](https://img.shields.io/github/issues/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/issues)
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/pulls)
 
-### **NPM Status**
+## **NPM Status**
 
 [![npm version](https://badgen.net/npm/v/n8n-nodes-telegram-grampro)](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
 [![npm downloads/week](https://img.shields.io/npm/dw/n8n-nodes-telegram-grampro?logo=npm&logoColor=white)](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
@@ -451,7 +371,7 @@ Made with [contrib.rocks](https://contrib.rocks).
 [![npm types](https://img.shields.io/npm/types/n8n-nodes-telegram-grampro)](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
 [![npm collaborators](https://img.shields.io/npm/collaborators/n8n-nodes-telegram-grampro)](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
 
-### **GitHub Status**
+## **GitHub Status**
 
 [![github release](https://badgen.net/github/release/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/releases)
 [![github stars](https://badgen.net/github/stars/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/stargazers)
@@ -463,7 +383,7 @@ Made with [contrib.rocks](https://contrib.rocks).
 [![GitHub PRs closed](https://img.shields.io/github/issues-pr-closed/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/pulls)
 [![Commit activity](https://img.shields.io/github/commit-activity/m/sadiakant/n8n-nodes-telegram-grampro)](https://github.com/sadiakant/n8n-nodes-telegram-grampro/commits/main)
 
-### **Dependency Status**
+## **Dependency Status**
 
 [![Telegram API](https://badgen.net/static/Telegram/API/229ED9)](https://core.telegram.org/api)
 [![TypeScript](https://badgen.net/static/TypeScript/5.x/3178C6)](https://www.typescriptlang.org/)
@@ -475,4 +395,4 @@ Made with [contrib.rocks](https://contrib.rocks).
 
 ---
 
-**Built with ❤️ for n8n automation workflows**
+<center><b>Built with ❤️ for n8n automation workflows</b></center>
