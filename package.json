@@ -28,7 +28,7 @@
 	"scripts": {
 		"build": "n8n-node build",
 		"build:watch": "tsc --watch",
-		"dev": "n8n-node dev --external-n8n",
+		"dev": "n8n-node dev",
 		"format": "prettier credentials nodes/TelegramGramPro nodes/TelegramGramProTrigger --write",
 		"lint": "n8n-node lint",
 		"lint:fix": "n8n-node lint --fix",
