@@ -2,9 +2,9 @@ import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
 import { getClient } from '../core/clientManager';
 import { safeExecute } from '../core/floodWaitHandler';
 import { withRateLimit } from '../core/rateLimiter';
-import { Api } from 'telegram';
+import { Api } from 'teleproto';
 import bigInt from 'big-integer';
-import { CustomFile } from 'telegram/client/uploads';
+import { CustomFile } from 'teleproto/client/uploads';
 
 import { logger } from '../core/logger';
 import { prepareTelegramTextInput, renderTelegramEntities } from '../core/messageFormatting';
@@ -1422,10 +1422,10 @@ async function sendPoll(
 	const isQuiz = this.getNodeParameter('isQuiz', i) as boolean;
 	const isAnonymous = this.getNodeParameter('anonymous', i, true) as boolean;
 
-	let correctAnswers: Buffer[] | undefined = undefined;
+	let correctAnswers: number[] | undefined = undefined;
 	if (isQuiz) {
 		const correctIndex = this.getNodeParameter('correctAnswerIndex', i) as number;
-		correctAnswers = [Buffer.from(correctIndex.toString())];
+		correctAnswers = [correctIndex];
 	}
 
 	const peer = await getEntityLoose(client, chatId);
@@ -1455,6 +1455,7 @@ async function sendPoll(
 						publicVoters: publicVoters,
 						multipleChoice: false,
 						quiz: isQuiz,
+						hash: bigInt(0),
 					}),
 					correctAnswers: correctAnswers,
 				}),
@@ -1613,8 +1614,8 @@ async function resolvePeer(client: TelegramClientInstance, rawId: unknown): Prom
 	if (/^\d+$/.test(asString)) {
 		throw new Error(
 			`Could not resolve Telegram entity for numeric ID ${asString}. ` +
-				`If this is a channel/group from a previous node, pass its full chat ID (for example -100${asString}) or make sure it appears in this account's dialog list. ` +
-				`If this is a user, Telegram also requires a cached access hash, so use their @username or interact with them first.`,
+			`If this is a channel/group from a previous node, pass its full chat ID (for example -100${asString}) or make sure it appears in this account's dialog list. ` +
+			`If this is a user, Telegram also requires a cached access hash, so use their @username or interact with them first.`,
 		);
 	}
 
@@ -2080,6 +2081,7 @@ async function handlePoll(
 					publicVoters: poll?.publicVoters,
 					multipleChoice: poll?.multipleChoice,
 					quiz: poll?.quiz,
+					hash: bigInt(0),
 				}),
 			}),
 			message: caption,

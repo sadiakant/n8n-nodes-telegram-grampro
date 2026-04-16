@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { StringSession } from 'telegram/sessions';
+import { StringSession } from 'teleproto/sessions';
 
 /**
  * Session encryption utility for secure storage of Telegram sessions

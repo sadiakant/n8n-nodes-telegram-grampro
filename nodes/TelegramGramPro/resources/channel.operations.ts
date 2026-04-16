@@ -2,9 +2,9 @@ import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
 import { getClient } from '../core/clientManager';
 import { safeExecute } from '../core/floodWaitHandler';
 import { withRateLimit } from '../core/rateLimiter';
-import { Api } from 'telegram';
+import { Api } from 'teleproto';
 import bigInt from 'big-integer';
-import { LogLevel } from 'telegram/extensions/Logger';
+import { LogLevel } from 'teleproto/extensions/Logger';
 import type { TelegramClientInstance, TelegramCredentials } from '../core/types';
 
 type ChannelEntity = Api.Chat | Api.Channel;
@@ -208,7 +208,7 @@ async function getChannelParticipants(
 
 		const chatParticipants =
 			result.fullChat instanceof Api.ChatFull &&
-			result.fullChat.participants instanceof Api.ChatParticipants
+				result.fullChat.participants instanceof Api.ChatParticipants
 				? result.fullChat.participants.participants
 				: [];
 

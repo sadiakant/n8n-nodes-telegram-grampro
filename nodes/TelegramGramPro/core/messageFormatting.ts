@@ -1,5 +1,5 @@
-import { Api } from 'telegram';
-import { HTMLParser } from 'telegram/extensions/html';
+import { Api } from 'teleproto';
+import { HTMLParser } from 'teleproto/extensions/html';
 
 type Stringable = { toString: () => string } | string | number | bigint;
 

@@ -1,7 +1,7 @@
 import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
 import { getClient } from '../core/clientManager';
 import { safeExecute } from '../core/floodWaitHandler';
-import { Api } from 'telegram';
+import { Api } from 'teleproto';
 import type { TelegramClientInstance, TelegramCredentials, TelegramEntity } from '../core/types';
 import {
 	buildSharedAlbumPayload,

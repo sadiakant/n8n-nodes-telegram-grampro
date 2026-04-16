@@ -1,4 +1,4 @@
-import { Api } from 'telegram';
+import { Api } from 'teleproto';
 import type {
 	IBinaryData,
 	IDataObject,
@@ -11,7 +11,7 @@ import { renderTelegramEntities } from './messageFormatting';
 import { formatBytesToHuman } from './fileSizeUtils';
 import type { TelegramTriggerChatType, TelegramTriggerPayload, TelegramEntity } from './types';
 
-export type SupportedUpdate = 'message' | 'edited_message';
+export type SupportedUpdate = 'message' | 'edited_message' | 'deleted_message' | 'user_update';
 
 export interface MessageContext {
 	chatName: string | null;

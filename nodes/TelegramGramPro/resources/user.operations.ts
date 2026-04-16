@@ -1,7 +1,7 @@
 import { IExecuteFunctions, INodeExecutionData, IDataObject } from 'n8n-workflow';
 import { getClient } from '../core/clientManager';
 import { safeExecute } from '../core/floodWaitHandler';
-import { Api } from 'telegram';
+import { Api } from 'teleproto';
 import { cache, CacheKeys } from '../core/cache';
 import type { TelegramClientInstance, TelegramCredentials } from '../core/types';
 
@@ -369,12 +369,12 @@ export async function getProfilePhoto(
 				} as IDataObject,
 				binary: photoData
 					? {
-							photo: {
-								data: photoData.toString('base64'),
-								mimeType: 'image/jpeg',
-								fileName: `profile_photo_${user.id}_${photoSize}.jpg`,
-							},
-						}
+						photo: {
+							data: photoData.toString('base64'),
+							mimeType: 'image/jpeg',
+							fileName: `profile_photo_${user.id}_${photoSize}.jpg`,
+						},
+					}
 					: undefined,
 				pairedItem: { item: i },
 			},

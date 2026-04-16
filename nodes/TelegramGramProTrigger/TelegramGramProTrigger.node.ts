@@ -1,4 +1,5 @@
 import type {
+	IDataObject,
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
@@ -6,13 +7,17 @@ import type {
 	ITriggerResponse,
 } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
-import { Api } from 'telegram';
-import { Album } from 'telegram/events/Album';
-import { EditedMessage } from 'telegram/events/EditedMessage';
-import { NewMessage } from 'telegram/events/NewMessage';
-import type { AlbumEvent } from 'telegram/events/Album';
-import type { EditedMessageEvent } from 'telegram/events/EditedMessage';
-import type { NewMessageEvent } from 'telegram/events/NewMessage';
+import { Api } from 'teleproto';
+import { Album } from 'teleproto/events/Album';
+import { EditedMessage } from 'teleproto/events/EditedMessage';
+import { NewMessage } from 'teleproto/events/NewMessage';
+import { DeletedMessage } from 'teleproto/events/DeletedMessage';
+import { UserUpdate } from 'teleproto/events/UserUpdate';
+import type { AlbumEvent } from 'teleproto/events/Album';
+import type { EditedMessageEvent } from 'teleproto/events/EditedMessage';
+import type { NewMessageEvent } from 'teleproto/events/NewMessage';
+import type { DeletedMessageEvent } from 'teleproto/events/DeletedMessage';
+import type { UserUpdateEvent } from 'teleproto/events/UserUpdate';
 
 import { testTelegramApi } from '../../credentials/TelegramGramProApi.credentials';
 import { disconnectClient, getClient } from '../TelegramGramPro/core/clientManager';
@@ -33,7 +38,7 @@ import {
 } from './trigger.shared';
 
 type RegisteredHandler = {
-	event: NewMessage | EditedMessage | Album;
+	event: NewMessage | EditedMessage | Album | DeletedMessage | UserUpdate;
 	handler: (...args: unknown[]) => void;
 };
 
@@ -99,6 +104,16 @@ export class TelegramGramProTrigger implements INodeType {
 						name: 'Edited Message',
 						value: 'edited_message',
 						description: 'Trigger when an existing message visible to the account is edited',
+					},
+					{
+						name: 'Deleted Message',
+						value: 'deleted_message',
+						description: 'Trigger when a message is deleted (teleproto feature)',
+					},
+					{
+						name: 'User Update',
+						value: 'user_update',
+						description: 'Trigger when a user goes online, offline, or changes status (teleproto feature)',
 					},
 				],
 			},
@@ -391,6 +406,42 @@ function createRegistration(
 		const event = new EditedMessage({});
 		const handler = (...args: unknown[]): void => {
 			void processEvent(args[0] as EditedMessageEvent, 'edited_message');
+		};
+
+		return {
+			event,
+			handler,
+		};
+	}
+
+	if (updateType === 'deleted_message') {
+		const event = new DeletedMessage({});
+		const handler = (...args: unknown[]): void => {
+			const deletedEvent = args[0] as DeletedMessageEvent;
+			const payload = {
+				updateType: 'deleted_message' as const,
+				deletedIds: deletedEvent.deletedIds ?? [],
+				channelId: deletedEvent.peer ? String(deletedEvent.peer) : undefined,
+			};
+			void emit([{ json: payload as unknown as IDataObject }]);
+		};
+
+		return {
+			event,
+			handler,
+		};
+	}
+
+	if (updateType === 'user_update') {
+		const event = new UserUpdate({});
+		const handler = (...args: unknown[]): void => {
+			const userEvent = args[0] as UserUpdateEvent;
+			const payload = {
+				updateType: 'user_update' as const,
+				userId: userEvent.userId ? String(userEvent.userId) : undefined,
+				status: userEvent.status,
+			};
+			void emit([{ json: payload as unknown as IDataObject }]);
 		};
 
 		return {

@@ -1,9 +1,9 @@
 import { IExecuteFunctions, INodeExecutionData, IDataObject } from 'n8n-workflow';
 import { getClient } from '../core/clientManager';
 import { safeExecute } from '../core/floodWaitHandler';
-import { Api } from 'telegram';
+import { Api } from 'teleproto';
 import bigInt from 'big-integer';
-import type { Dialog } from 'telegram/tl/custom/dialog';
+import type { Dialog } from 'teleproto/tl/custom/dialog';
 
 import { cache, CacheKeys } from '../core/cache';
 import type { TelegramClientInstance, TelegramCredentials } from '../core/types';

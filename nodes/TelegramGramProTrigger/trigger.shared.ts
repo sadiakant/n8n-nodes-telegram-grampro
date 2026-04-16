@@ -1,5 +1,5 @@
 import { ITriggerFunctions, NodeParameterValueType, INodeExecutionData } from 'n8n-workflow';
-import { Api } from 'telegram';
+import { Api } from 'teleproto';
 
 import { TelegramTriggerPayload } from '../TelegramGramPro/core/types';
 import {

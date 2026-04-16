@@ -1,6 +1,6 @@
-import { TelegramClient } from 'telegram';
-import { StringSession } from 'telegram/sessions';
-import { LogLevel } from 'telegram/extensions/Logger';
+import { TelegramClient } from 'teleproto';
+import { StringSession } from 'teleproto/sessions';
+import { LogLevel } from 'teleproto/extensions/Logger';
 import { logger } from './logger';
 import { SessionEncryption } from './sessionEncryption';
 import * as crypto from 'crypto';
@@ -54,7 +54,7 @@ function cleanupStaleConnections(): void {
 			logger.info(
 				`[ClientManager] Auto-disconnecting idle client (no event handlers, idle ${Math.round((now - lastUsed) / 1000)}s): ${key}`,
 			);
-			gracefulDestroy(client).catch(() => {});
+			gracefulDestroy(client).catch(() => { });
 			clients.delete(key);
 			clientLastUsed.delete(key);
 		}
@@ -134,6 +134,8 @@ export async function getClient(
 				);
 				try {
 					await existingClient.connect();
+					// Recover any updates missed during disconnect
+					await existingClient.catchUp?.();
 					clientLastUsed.set(key, Date.now());
 					return existingClient;
 				} catch {
@@ -182,13 +184,14 @@ export async function getClient(
 		const stringSession = new StringSession(decryptedSession);
 		const client = new TelegramClient(stringSession, numericApiId, apiHash, {
 			connectionRetries: 5,
-			useWSS: false, // TCP is more stable for server-side n8n than WSS
 			autoReconnect,
 		});
 		client.setLogLevel(LogLevel.ERROR);
 
 		try {
 			await client.connect();
+			// Recover any updates missed during disconnect (teleproto feature)
+			await client.catchUp?.();
 
 			// Verify authorization only when we intend to keep using this client.
 			if (verifyAuthorization) {

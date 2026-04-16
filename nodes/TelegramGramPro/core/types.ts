@@ -1,7 +1,7 @@
 import type { IDataObject, LogMetadata } from 'n8n-workflow';
-import { Api, TelegramClient } from 'telegram';
-import type { EntityLike, FileLike } from 'telegram/define';
-import type { NewMessage, NewMessageEvent } from 'telegram/events';
+import { Api, TelegramClient } from 'teleproto';
+import type { EntityLike, FileLike } from 'teleproto/define';
+import type { NewMessage, NewMessageEvent } from 'teleproto/events';
 
 export interface TelegramCredentials extends IDataObject {
 	apiId: number | string;
@@ -28,7 +28,7 @@ export type TelegramUnknownRecord = Record<string, unknown>;
 export type TelegramLoggerContext = LogMetadata | Error | TelegramUnknownRecord | undefined;
 
 export interface TelegramTriggerPayload extends IDataObject {
-	updateType?: 'message' | 'edited_message';
+	updateType?: 'message' | 'edited_message' | 'deleted_message' | 'user_update';
 	groupedId?: string;
 	mediaCount?: number;
 	message?: string;
@@ -189,7 +189,6 @@ export interface TelegramClientConfig {
 	apiId: number;
 	apiHash: string;
 	session: string;
-	useWSS?: boolean;
 	connectionRetries?: number;
 	autoReconnect?: boolean;
 	connectTimeout?: number;

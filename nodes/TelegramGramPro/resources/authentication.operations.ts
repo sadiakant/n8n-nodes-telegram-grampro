@@ -1,10 +1,10 @@
 import { IExecuteFunctions, INodeExecutionData, IDataObject, GenericValue } from 'n8n-workflow';
-import { TelegramClient, Api } from 'telegram';
-import { StringSession } from 'telegram/sessions';
+import { TelegramClient, Api } from 'teleproto';
+import { StringSession } from 'teleproto/sessions';
 import { logger } from '../core/logger';
 import { safeExecute } from '../core/floodWaitHandler';
 import { mapTelegramError } from '../core/telegramErrorMapper';
-import { LogLevel } from 'telegram/extensions/Logger';
+import { LogLevel } from 'teleproto/extensions/Logger';
 import { generateQrPngBuffer, getQrPngFileName } from '../core/qrPng';
 
 type SentCodeDetails = {
@@ -237,7 +237,6 @@ async function requestCode(this: IExecuteFunctions, i: number): Promise<INodeExe
 
 	const client = new TelegramClient(new StringSession(''), apiId, apiHash, {
 		connectionRetries: 1,
-		useWSS: false,
 		autoReconnect: false,
 	});
 
@@ -357,7 +356,6 @@ async function resendCode(this: IExecuteFunctions, i: number): Promise<INodeExec
 
 	const client = new TelegramClient(new StringSession(preAuthSession), apiId, apiHash, {
 		connectionRetries: 1,
-		useWSS: false,
 		autoReconnect: false,
 	});
 
@@ -442,7 +440,6 @@ async function requestQrLogin(this: IExecuteFunctions, i: number): Promise<INode
 
 	let client = new TelegramClient(new StringSession(''), apiId, apiHash, {
 		connectionRetries: 1,
-		useWSS: false,
 		autoReconnect: false,
 	});
 
@@ -452,10 +449,10 @@ async function requestQrLogin(this: IExecuteFunctions, i: number): Promise<INode
 	let expires: number | undefined;
 	let qrBinary:
 		| {
-				data: string;
-				fileName: string;
-				mimeType: string;
-		  }
+			data: string;
+			fileName: string;
+			mimeType: string;
+		}
 		| undefined;
 
 	try {
@@ -475,13 +472,12 @@ async function requestQrLogin(this: IExecuteFunctions, i: number): Promise<INode
 
 		if (result instanceof Api.auth.LoginTokenMigrateTo) {
 			const migrateDcId = result.dcId;
-			const dcInfo = await client.getDC(migrateDcId, false, false);
+			const dcInfo = await client.getDC(migrateDcId, false);
 
 			await forceCleanup(client, 'qr-login-request-disconnect');
 
 			const migratedClient = new TelegramClient(new StringSession(''), apiId, apiHash, {
 				connectionRetries: 5,
-				useWSS: false,
 				autoReconnect: true,
 			});
 			migratedClient.session.setDC(migrateDcId, dcInfo.ipAddress, dcInfo.port);
@@ -570,7 +566,6 @@ async function completeQrLogin(this: IExecuteFunctions, i: number): Promise<INod
 
 	let client = new TelegramClient(new StringSession(preAuthSession), apiId, apiHash, {
 		connectionRetries: 1,
-		useWSS: false,
 		autoReconnect: false,
 	});
 
@@ -610,7 +605,7 @@ async function completeQrLogin(this: IExecuteFunctions, i: number): Promise<INod
 			const migrateDcId = result.dcId;
 
 			// Fetch the target DC ip and port using the current (still connected) client
-			const dcInfo = await client.getDC(migrateDcId, false, false);
+			const dcInfo = await client.getDC(migrateDcId, false);
 
 			// Bypass client._switchDC to prevent hangs related to node/gramjs environments
 			await forceCleanup(client, 'qr-login-disconnect');
@@ -618,7 +613,6 @@ async function completeQrLogin(this: IExecuteFunctions, i: number): Promise<INod
 			// Create a brand new client initialized to the new DC
 			const migratedClient = new TelegramClient(new StringSession(''), apiId, apiHash, {
 				connectionRetries: 5,
-				useWSS: false,
 				autoReconnect: true,
 			});
 
@@ -742,7 +736,6 @@ async function signIn(this: IExecuteFunctions, i: number): Promise<INodeExecutio
 
 	const client = new TelegramClient(new StringSession(preAuthSession), apiId, apiHash, {
 		connectionRetries: 1,
-		useWSS: false,
 		autoReconnect: false,
 	});
 
