@@ -405,7 +405,7 @@ function formatDate(date: Date): string {
 	const time = timePieces[0] || '';
 	const ampm = (timePieces[1] || '').toUpperCase();
 	const datePart = `${day}-${month}-${year}`;
-	return `${datePart} (${time} ${ampm}) - IST`;
+	return `${datePart} (${time} ${ampm})`;
 }
 
 function normalizeIdForGroup(rawId: string): string {

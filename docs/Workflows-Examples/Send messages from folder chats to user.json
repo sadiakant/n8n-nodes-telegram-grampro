@@ -8,26 +8,35 @@
 			"name": "Loop Channels",
 			"type": "n8n-nodes-base.splitInBatches",
 			"typeVersion": 3,
-			"position": [-448, 848]
+			"position": [
+				-448,
+				848
+			]
 		},
 		{
 			"parameters": {
-				"jsCode": "const now = Date.now();\nconst limit = now - (24 * 60 * 60 * 1000);\n\nconst filteredItems = items.filter(i => {\n  const item = i.json;\n  if (!item.date) return false;\n  const msgTime = item.date * 1000;\n  if (msgTime <= limit) return false;\n  if (item.isOutgoing === true) return false;\n  const messageText = item.text || \"\";\n  if (!messageText.toLowerCase().includes('example-domain.com')) return false;\n  return true;\n});\n\nreturn filteredItems.map(i => {\n  return {\n    json: {\n      sourceName: String(i.json.sourceName),\n      sourceId: String(i.json.sourceId),\n      message_id: String(i.json.id)\n    }\n  };\n});"
+				"jsCode": "const now = Date.now();\nconst limit = now - (24 * 60 * 60 * 1000); // 24 Hours\n\n// Filter Logic\nconst filteredItems = items.filter(i => {\n  const item = i.json || i;        // ← Ye line sab fix kar degi\n\n  // 1. Time check (Last 24 hours)\n  if (!item.date) return false;\n  const msgTime = new Date(item.date).getTime();\n  if (msgTime <= limit) return false;\n\n  // 2. Outgoing check\n  if (item.isOutgoing === true) return false;\n\n  // 3. Text Filter: Check for \"diskwala.com\"\n  const messageText = (item.message || item.rawMessage || \"\").toLowerCase();\n  if (!messageText.includes('diskwala.com')) return false;\n\n  return true;\n});\n\n// Final Output mapping\nreturn filteredItems.map(i => {\n  const item = i.json || i;        // ← Yaha bhi safe side ke liye\n  return {\n    json: {\n      sourceName: String(item.chatName || item.senderName || 'Unknown'),\n      sourceId: String(item.chatId || item.senderId || ''),\n      message_id: String(item.messageId || item.id || '')\n    }\n  };\n});"
 			},
 			"id": "node-filter-logic",
 			"name": "Filter Logic (24h/Reply)",
 			"type": "n8n-nodes-base.code",
 			"typeVersion": 2,
-			"position": [16, 944],
+			"position": [
+				16,
+				944
+			],
 			"alwaysOutputData": true
 		},
 		{
 			"parameters": {
-				"jsCode": "return items.filter(i => {\n  const msgId = i.json.message_id || i.json.id;\n  const chatId = i.json.sourceId;\n  return (msgId != null && msgId !== \"\" && chatId != null && chatId !== \"\");\n}).map(i => {\n  return {\n    json: {\n      message_id: String(i.json.message_id || i.json.id),\n      chat_id: String(i.json.sourceId)\n    }\n  };\n});"
+				"jsCode": "return items\n.filter(i => {\n  // Check for message_id (or id) AND sourceId\n  const msgId = i.json.message_id || i.json.id;\n  const chatId = i.json.sourceId; // Changed from chat_id to sourceId\n\n  // Return true only if both exist and are not empty\n  return (\n    msgId != null && msgId !== \"\" &&\n    chatId != null && chatId !== \"\"\n  );\n})\n.map(i => {\n  const finalMsgId = i.json.message_id || i.json.id;\n  const finalChatId = i.json.sourceId;\n  \n  return {\n    json: {\n      message_id: String(finalMsgId),\n      chat_id: String(finalChatId) // Mapping sourceId to chat_id for the output\n    }\n  };\n});"
 			},
 			"type": "n8n-nodes-base.code",
 			"typeVersion": 2,
-			"position": [-224, 560],
+			"position": [
+				-224,
+				560
+			],
 			"id": "node-remove-invalid",
 			"name": "Filter Logic (Remove Invalid Messages)"
 		},
@@ -37,7 +46,10 @@
 			},
 			"type": "n8n-nodes-base.splitInBatches",
 			"typeVersion": 3,
-			"position": [16, 464],
+			"position": [
+				16,
+				464
+			],
 			"id": "node-loop-items",
 			"name": "Loop Over Items"
 		},
@@ -48,11 +60,16 @@
 				"mode": "hours",
 				"maxMessages": 3,
 				"onlyMedia": true,
-				"mediaType": ["photo"]
+				"mediaType": [
+					"photo"
+				]
 			},
 			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
-			"position": [-208, 960],
+			"position": [
+				-208,
+				960
+			],
 			"id": "node-get-history",
 			"name": "GetHistory message",
 			"alwaysOutputData": true,
@@ -73,7 +90,10 @@
 			},
 			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
-			"position": [224, 656],
+			"position": [
+				224,
+				656
+			],
 			"id": "node-send-messages",
 			"name": "Send Messages to User",
 			"credentials": {
@@ -90,7 +110,10 @@
 			},
 			"type": "n8n-nodes-base.wait",
 			"typeVersion": 1.1,
-			"position": [448, 736],
+			"position": [
+				448,
+				736
+			],
 			"id": "node-wait-2s",
 			"name": "Flood Wait (2 Sec)"
 		},
@@ -101,7 +124,10 @@
 			},
 			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
-			"position": [448, 464],
+			"position": [
+				448,
+				464
+			],
 			"id": "node-notify-success",
 			"name": "Send Message to Admin",
 			"executeOnce": true,
@@ -129,7 +155,10 @@
 			},
 			"type": "n8n-nodes-base.executeWorkflow",
 			"typeVersion": 1.3,
-			"position": [672, 464],
+			"position": [
+				672,
+				464
+			],
 			"id": "node-sub-workflow",
 			"name": "Call Next Workflow",
 			"alwaysOutputData": false
@@ -141,7 +170,10 @@
 			},
 			"type": "n8n-nodes-base.wait",
 			"typeVersion": 1.1,
-			"position": [224, 464],
+			"position": [
+				224,
+				464
+			],
 			"id": "node-wait-2m",
 			"name": "Wait 2 Min"
 		},
@@ -152,7 +184,10 @@
 			},
 			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
-			"position": [448, 928],
+			"position": [
+				448,
+				928
+			],
 			"id": "node-error-1",
 			"name": "Send Error Message (1)",
 			"credentials": {
@@ -169,7 +204,10 @@
 			},
 			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
-			"position": [16, 1136],
+			"position": [
+				16,
+				1136
+			],
 			"id": "node-error-2",
 			"name": "Send Error Message (2)",
 			"credentials": {
@@ -186,7 +224,10 @@
 			},
 			"type": "n8n-nodes-base.splitOut",
 			"typeVersion": 1,
-			"position": [-672, 848],
+			"position": [
+				-672,
+				848
+			],
 			"id": "node-split-out",
 			"name": "Split Out"
 		},
@@ -212,7 +253,10 @@
 			},
 			"type": "n8n-nodes-base.filter",
 			"typeVersion": 2.3,
-			"position": [-896, 848],
+			"position": [
+				-896,
+				848
+			],
 			"id": "node-main-filter",
 			"name": "Filter"
 		},
@@ -224,7 +268,10 @@
 			},
 			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
-			"position": [-1120, 848],
+			"position": [
+				-1120,
+				848
+			],
 			"id": "node-get-chats",
 			"name": "Get Chats List",
 			"credentials": {
@@ -248,49 +295,184 @@
 			"name": "Daily Trigger",
 			"type": "n8n-nodes-base.scheduleTrigger",
 			"typeVersion": 1.1,
-			"position": [-1344, 848]
+			"position": [
+				-1344,
+				848
+			]
 		}
 	],
 	"connections": {
 		"Loop Channels": {
 			"main": [
-				[{ "node": "Filter Logic (Remove Invalid Messages)", "type": "main", "index": 0 }],
-				[{ "node": "GetHistory message", "type": "main", "index": 0 }]
+				[
+					{
+						"node": "Filter Logic (Remove Invalid Messages)",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "GetHistory message",
+						"type": "main",
+						"index": 0
+					}
+				]
 			]
 		},
 		"Filter Logic (24h/Reply)": {
-			"main": [[{ "node": "Loop Channels", "type": "main", "index": 0 }]]
+			"main": [
+				[
+					{
+						"node": "Loop Channels",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
 		},
 		"Filter Logic (Remove Invalid Messages)": {
-			"main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]]
+			"main": [
+				[
+					{
+						"node": "Loop Over Items",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
 		},
 		"Loop Over Items": {
 			"main": [
-				[{ "node": "Wait 2 Min", "type": "main", "index": 0 }],
-				[{ "node": "Send Messages to User", "type": "main", "index": 0 }]
+				[
+					{
+						"node": "Wait 2 Min",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Send Messages to User",
+						"type": "main",
+						"index": 0
+					}
+				]
 			]
 		},
 		"GetHistory message": {
 			"main": [
-				[{ "node": "Filter Logic (24h/Reply)", "type": "main", "index": 0 }],
-				[{ "node": "Send Error Message (2)", "type": "main", "index": 0 }]
+				[
+					{
+						"node": "Filter Logic (24h/Reply)",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Send Error Message (2)",
+						"type": "main",
+						"index": 0
+					}
+				]
 			]
 		},
 		"Send Messages to User": {
 			"main": [
-				[{ "node": "Flood Wait (2 Sec)", "type": "main", "index": 0 }],
-				[{ "node": "Send Error Message (1)", "type": "main", "index": 0 }]
+				[
+					{
+						"node": "Flood Wait (2 Sec)",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Send Error Message (1)",
+						"type": "main",
+						"index": 0
+					}
+				]
 			]
 		},
-		"Flood Wait (2 Sec)": { "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]] },
-		"Send Message to Admin": {
-			"main": [[{ "node": "Call Next Workflow", "type": "main", "index": 0 }]]
+		"Flood Wait (2 Sec)": {
+			"main": [
+				[
+					{
+						"node": "Loop Over Items",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
 		},
-		"Wait 2 Min": { "main": [[{ "node": "Send Message to Admin", "type": "main", "index": 0 }]] },
-		"Split Out": { "main": [[{ "node": "Loop Channels", "type": "main", "index": 0 }]] },
-		"Filter": { "main": [[{ "node": "Split Out", "type": "main", "index": 0 }]] },
-		"Get Chats List": { "main": [[{ "node": "Filter", "type": "main", "index": 0 }]] },
-		"Daily Trigger": { "main": [[{ "node": "Get Chats List", "type": "main", "index": 0 }]] }
+		"Send Message to Admin": {
+			"main": [
+				[
+					{
+						"node": "Call Next Workflow",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Wait 2 Min": {
+			"main": [
+				[
+					{
+						"node": "Send Message to Admin",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Split Out": {
+			"main": [
+				[
+					{
+						"node": "Loop Channels",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Filter": {
+			"main": [
+				[
+					{
+						"node": "Split Out",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Get Chats List": {
+			"main": [
+				[
+					{
+						"node": "Filter",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Daily Trigger": {
+			"main": [
+				[
+					{
+						"node": "Get Chats List",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		}
 	},
 	"meta": {
 		"templateCredsSetupCompleted": true,

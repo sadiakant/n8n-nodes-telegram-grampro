@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-telegram-grampro",
-	"version": "5.0.5",
+	"version": "5.0.6",
 	"description": "Telegram GramPro is Advanced n8n node for Telegram MTProto automation using GramJS, featuring user account triggers and 2FA support.",
 	"license": "MIT",
 	"keywords": [

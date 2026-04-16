@@ -6,7 +6,10 @@
 			},
 			"type": "n8n-nodes-base.splitInBatches",
 			"typeVersion": 3,
-			"position": [-400, 768],
+			"position": [
+				-400,
+				768
+			],
 			"id": "node-loop-001",
 			"name": "Loop Over Items"
 		},
@@ -16,17 +19,23 @@
 			},
 			"type": "n8n-nodes-base.wait",
 			"typeVersion": 1.1,
-			"position": [48, 800],
+			"position": [
+				48,
+				800
+			],
 			"id": "node-wait-001",
 			"name": "Flood Control (2 Sec)"
 		},
 		{
 			"parameters": {
-				"jsCode": "// 1. Configuration\nconst destinationChannels = [\n  '-1111111111111',\n  '-2222222222222',\n  '-3333333333333',\n  '-4444444444444',\n  '-5555555555555'\n];\n\nconst targetDomainRegex = /example\\.com/i; // Case-insensitive\nconst now = Date.now();\nconst limit = now - (24 * 60 * 60 * 1000);\n\nconst filteredItems = items.filter(i => {\n  const data = i.json;\n  const msgId = data.id || data.message_id || data.msg_id;\n  const msgText = data.text || data.message || data.caption || \"\";\n  const msgDate = data.date;\n  const isOut = data.isOutgoing ?? data.out ?? false;\n\n  if (!msgId || (typeof msgId === 'string' && msgId.trim() === \"\")) return false;\n  if (!msgDate || (msgDate * 1000) <= limit) return false;\n  if (isOut === true) return false;\n  if (!targetDomainRegex.test(msgText)) return false;\n\n  return true;\n});\n\nreturn filteredItems.map((item, index) => {\n  const data = item.json;\n  const channelIndex = index % destinationChannels.length;\n\n  return {\n    json: {\n      message_id: String(data.id || data.message_id || data.msg_id),\n      Source_Name: String(data.sourceName || data.Source_Name),\n      sourceId: String(data.sourceId || data.chat_id),\n      DestinationID: destinationChannels[channelIndex],\n      text: data.text || data.message || data.caption || \"\",\n      match_found: true,\n      original_index: index\n    }\n  };\n});"
+				"jsCode": "// 1. Configuration\nconst destinationChannels = [\n '-1111111111111',\n  '-2222222222222',\n  '-3333333333333',\n  '-4444444444444',\n  '-5555555555555'\n];\n\nconst targetDomainRegex = /example\\.com/i; // Case-insensitive\nconst now = Date.now();\nconst limit = now - (24 * 60 * 60 * 1000); // Last 24 Hours\n\n// === FILTER LOGIC (Updated for new input) ===\nconst filteredItems = items.filter(i => {\n  // Support both old n8n style ({json: ...}) aur new flat style\n  const data = i.json || i;\n  if (!data) return false;\n\n  // --- AUTO-DETECT KEYS (new structure ke hisab se) ---\n  const msgId = data.messageId || data.id || data.message_id || data.msg_id;\n  const msgText = data.message || data.text || data.caption || data.rawMessage || \"\";\n  const msgDateStr = data.date;                    // ab ISO string hai\n  const isOut = data.isOutgoing ?? data.out ?? false;\n\n  // --- VALIDATION CHECKS ---\n  // ID Check\n  if (!msgId || (typeof msgId === 'string' && msgId.trim() === \"\")) return false;\n\n  // Time Check (ISO string handle kiya)\n  let msgTimestamp = 0;\n  if (typeof msgDateStr === 'string' && msgDateStr.includes('T')) {\n    msgTimestamp = new Date(msgDateStr).getTime();\n  } else if (typeof msgDateStr === 'number') {\n    msgTimestamp = msgDateStr * 1000;\n  }\n\n  if (!msgTimestamp || msgTimestamp <= limit) return false;\n\n  // Outgoing skip (sirf User ke replay messages rakhna hai)\n  if (isOut === true) return false;\n\n  // Example.com link check\n  if (!targetDomainRegex.test(msgText)) return false;\n\n  return true;\n});\n\n// === ROUND ROBIN DISTRIBUTION ===\nreturn filteredItems.map((item, index) => {\n  const data = item.json || item;   // same support\n\n  const channelIndex = index % destinationChannels.length;\n\n  // Updated field mapping\n  const finalMsgId   = data.messageId || data.id || data.message_id || data.msg_id || '';\n  const finalSrcName = data.senderName || data.sourceName || data.Source_Name || data.chatName || 'Unknown';\n  const finalChatId  = data.chatId || data.sourceId || data.chat_id || data.senderId || '';\n  const finalText = data.message || data.rawMessage || data.text || data.caption || \"\";\n  const finalDate    = data.humanDate || data.human_date || data.date || \"\";\n  const finalHasMedia = data.hasMedia ?? data.has_media ?? false;\n  const finalMediaType = data.messageType || data.mediaType || data.media_type || null;\n\n  return {\n    json: {\n      message_id: String(finalMsgId),\n      Source_Name: String(finalSrcName),\n      sourceId: String(finalChatId),\n      DestinationID: destinationChannels[channelIndex],\n      text: finalText,\n      humanDate: finalDate,\n      hasMedia: finalHasMedia,\n      mediaType: finalMediaType,\n      match_found: true,\n      original_index: index\n    }\n  };\n});"
 			},
 			"type": "n8n-nodes-base.code",
 			"typeVersion": 2,
-			"position": [-848, 768],
+			"position": [
+				-848,
+				768
+			],
 			"id": "node-code-filter",
 			"name": "Filter (24 Hours/Divides)"
 		},
@@ -36,7 +45,10 @@
 			},
 			"type": "n8n-nodes-base.code",
 			"typeVersion": 2,
-			"position": [-624, 768],
+			"position": [
+				-624,
+				768
+			],
 			"id": "node-code-logic",
 			"name": "Filter Logic (Remove Invalid Messages)"
 		},
@@ -48,7 +60,10 @@
 			},
 			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
-			"position": [-1072, 768],
+			"position": [
+				-1072,
+				768
+			],
 			"id": "node-tg-get",
 			"name": "Get Messages from Source",
 			"credentials": {
@@ -68,7 +83,10 @@
 			},
 			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
-			"position": [-176, 800],
+			"position": [
+				-176,
+				800
+			],
 			"id": "node-tg-copy",
 			"name": "Send Messages to My Channels",
 			"credentials": {
@@ -86,7 +104,10 @@
 			},
 			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
-			"position": [-176, 576],
+			"position": [
+				-176,
+				576
+			],
 			"id": "node-tg-notify",
 			"name": "Send Message to Admin",
 			"executeOnce": true,
@@ -105,7 +126,10 @@
 			"typeVersion": 1.1,
 			"name": "Execute Workflow Trigger",
 			"type": "n8n-nodes-base.executeWorkflowTrigger",
-			"position": [-1296, 768]
+			"position": [
+				-1296,
+				768
+			]
 		},
 		{
 			"parameters": {
@@ -114,7 +138,10 @@
 			},
 			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
-			"position": [48, 576],
+			"position": [
+				48,
+				576
+			],
 			"id": "node-tg-clear",
 			"name": "Clear User History",
 			"credentials": {
@@ -133,7 +160,10 @@
 			},
 			"type": "n8n-nodes-base.executeWorkflow",
 			"typeVersion": 1.3,
-			"position": [272, 576],
+			"position": [
+				272,
+				576
+			],
 			"id": "node-wf-next",
 			"name": "Call Censor Workflow"
 		},
@@ -144,7 +174,10 @@
 			},
 			"type": "n8n-nodes-telegram-grampro.telegramGramPro",
 			"typeVersion": 1,
-			"position": [48, 992],
+			"position": [
+				48,
+				992
+			],
 			"id": "node-tg-error",
 			"name": "Send Error Message",
 			"credentials": {
@@ -162,7 +195,10 @@
 				"color": 6
 			},
 			"type": "n8n-nodes-base.stickyNote",
-			"position": [-880, 576],
+			"position": [
+				-880,
+				576
+			],
 			"typeVersion": 1,
 			"id": "node-note-001",
 			"name": "Sticky Note"
@@ -171,36 +207,116 @@
 	"connections": {
 		"Loop Over Items": {
 			"main": [
-				[{ "node": "Send Message to Admin", "type": "main", "index": 0 }],
-				[{ "node": "Send Messages to My Channels", "type": "main", "index": 0 }]
+				[
+					{
+						"node": "Send Message to Admin",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Send Messages to My Channels",
+						"type": "main",
+						"index": 0
+					}
+				]
 			]
 		},
 		"Flood Control (2 Sec)": {
-			"main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]]
+			"main": [
+				[
+					{
+						"node": "Loop Over Items",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
 		},
 		"Filter (24 Hours/Divides)": {
-			"main": [[{ "node": "Filter Logic (Remove Invalid Messages)", "type": "main", "index": 0 }]]
+			"main": [
+				[
+					{
+						"node": "Filter Logic (Remove Invalid Messages)",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
 		},
 		"Filter Logic (Remove Invalid Messages)": {
-			"main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]]
+			"main": [
+				[
+					{
+						"node": "Loop Over Items",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
 		},
 		"Get Messages from Source": {
-			"main": [[{ "node": "Filter (24 Hours/Divides)", "type": "main", "index": 0 }]]
+			"main": [
+				[
+					{
+						"node": "Filter (24 Hours/Divides)",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
 		},
 		"Send Messages to My Channels": {
 			"main": [
-				[{ "node": "Flood Control (2 Sec)", "type": "main", "index": 0 }],
-				[{ "node": "Send Error Message", "type": "main", "index": 0 }]
+				[
+					{
+						"node": "Flood Control (2 Sec)",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Send Error Message",
+						"type": "main",
+						"index": 0
+					}
+				]
 			]
 		},
 		"Send Message to Admin": {
-			"main": [[{ "node": "Clear User History", "type": "main", "index": 0 }]]
+			"main": [
+				[
+					{
+						"node": "Clear User History",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
 		},
 		"Execute Workflow Trigger": {
-			"main": [[{ "node": "Get Messages from Source", "type": "main", "index": 0 }]]
+			"main": [
+				[
+					{
+						"node": "Get Messages from Source",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
 		},
 		"Clear User History": {
-			"main": [[{ "node": "Call Censor Workflow", "type": "main", "index": 0 }]]
+			"main": [
+				[
+					{
+						"node": "Call Censor Workflow",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
 		}
 	},
 	"meta": {
