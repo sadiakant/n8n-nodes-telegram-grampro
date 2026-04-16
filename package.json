@@ -49,15 +49,14 @@
 	"bugs": {
 		"url": "https://github.com/sadiakant/n8n-nodes-telegram-grampro/issues"
 	},
-	"dependencies": {
-		"teleproto": "^1.224.1"
-	},
+	"dependencies": {},
 	"devDependencies": {
 		"@n8n/node-cli": "^0.27.0",
 		"eslint": "9.39.4",
 		"prettier": "3.8.1",
 		"release-it": "^20.0.0",
-		"typescript": "5.9.3"
+		"typescript": "5.9.3",
+		"teleproto": "^1.224.1"
 	},
 	"peerDependencies": {
 		"n8n-workflow": "*"
