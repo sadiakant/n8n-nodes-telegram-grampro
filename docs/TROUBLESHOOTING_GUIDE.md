@@ -1,10 +1,12 @@
-# Telegram GramPro - Troubleshooting Guide
+# 🔧 Telegram GramPro - Troubleshooting Guide
 
-## Overview
+## 📖 Overview
 
-This comprehensive troubleshooting guide helps you diagnose and resolve common issues with the Telegram GramPro n8n node. Whether you're facing authentication problems, connection issues, or operation errors, this guide provides step-by-step solutions with enhanced error handling and new features.
+Having trouble with your Telegram automation? This guide covers everything from authentication failures to "noisy" triggers. Let's get your workflows back on track! 🚀
 
-## Trigger Filter Troubleshooting
+---
+
+## 🔔 Trigger Troubleshooting
 
 ### Selected or excluded chat list matches only one source
 
@@ -25,6 +27,19 @@ If your `Selected Chats` or `Except Selected Chats` field appears to match only 
 - JSON arrays such as `["username1","-100123456789","8569392472"]` are recommended, but comma-separated input also works
 
 If no items match, the trigger emits no events.
+
+### Deleted Message trigger is not showing the message content
+
+The `Deleted Message` trigger depends on GramPro "remembering" the message before it was deleted.
+- The trigger only remembers messages that passed through the trigger while it was **Active**.
+- If a message was sent *before* you started the trigger and then deleted, GramPro cannot know what the original content was.
+- Snapshot memory is stored in RAM and cleared if n8n restarts.
+
+### User Update trigger is very noisy
+
+The `User Update` trigger fires whenever a user's status changes (Online -> Offline, etc.).
+- Use **Selected Chats Only** if you only want to monitor specific users.
+- Use **Except Selected Chats Only** to ignore bots or high-activity users.
 
 ### Trigger does not fire for my own sent messages
 
@@ -48,9 +63,9 @@ Check these points:
 - Numeric ID aliases are matched automatically, so `123`, `-123`, and `-100123` can all resolve to the same Telegram entity
 - Trigger output `chatId` and `senderId` can be used directly for reliable exclusion matching
 
-## 🚨 Common Issues & Solutions
+---
 
-### **Authentication Errors**
+## 🔐 Authentication Troubleshooting
 
 #### **"Code not sent" Error**
 **Problem**: Verification code not received on your phone.

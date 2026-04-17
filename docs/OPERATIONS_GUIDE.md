@@ -1,78 +1,67 @@
-# Telegram GramPro - Operations Guide
+# 🛠️ Telegram GramPro - Operations Guide
 
-## Overview
+## 📖 Overview
 
-This guide provides comprehensive documentation for all operations available in the Telegram GramPro n8n node. Each operation is designed to work seamlessly with Telegram's MTProto protocol through GramJS, with enterprise-grade security, performance optimization, and comprehensive error handling.
+This guide provides comprehensive documentation for all operations available in the Telegram GramPro n8n node. Each operation is designed to work seamlessly with Telegram's MTProto protocol through **Teleproto** (a robust GramJS fork), with enterprise-grade security, performance optimization, and comprehensive error handling.
 
-## Trigger Nodes
+---
+
+## 🔔 Trigger Nodes
 
 Telegram GramPro now provides one unified trigger node:
-
 - `Telegram GramPro Trigger` (`telegramGramProTrigger`)
 
-This trigger uses a persistent MTProto listener. Telegram user accounts do not support the Bot API webhook registration flow used by the official n8n Telegram bot trigger.
+> [!IMPORTANT]
+> This trigger uses a persistent MTProto listener. Telegram user accounts do not support the Bot API webhook registration flow used by the official n8n Telegram bot trigger.
 
-### Trigger Events
+### 🎭 Supported Events
 
-Supported updates:
+| Event | Icon | Description |
+| :--- | :---: | :--- |
+| **Message** | 📩 | New messages (including albums/groups) |
+| **Edited Message** | ✏️ | When an existing message is modified |
+| **Deleted Message** | 🗑️ | When messages are deleted (v6.0.0+) |
+| **User Update** | 👤 | Real-time status changes (Online/Offline) |
 
-- `Message`
-- `Edited Message`
+### 🔍 Trigger Filters
 
-### Trigger Filters
+- **Listening Mode**: Capture `Incoming`, `Outgoing`, or both.
+- **Filtering Logic**: 
+  - `All Messages`: The default wide-net filter.
+  - `Specific Filters`: `Only User`, `Only Channel`, or `Only Group` messages.
+- **Targeting**: Use **Selected Chats Only** to monitor white-listed entities.
+- **Exclusion**: Use **Except Selected Chats** to ignore noisy bots or groups.
 
-- **Listening Mode**: Capture `Incoming Messages`, `Outgoing Messages`, or both.
-- **All Messages**: Catch all supported updates unless a more specific include filter is enabled.
-- **Only User Messages**: Limit events to private user or bot chats.
-- **Only Channel Messages**: Limit events to broadcast channels only.
-- **Only Group Messages**: Limit events to classic groups, supergroups, and gigagroups.
-- **Selected Chats Only**: Match only selected chats/senders from a JSON array or comma-separated list.
-- **Except Selected Chats Only**: Exclude selected chats/senders after the main include filter is applied.
+### 🆔 Identifier Matching
+Matching is intelligent and supports multiple formats:
+- **Chat ID / Sender ID**: Numeric (e.g., `12345`)
+- **Usernames**: With or without `@` (e.g., `@sadia_kant`)
+- **Titles**: Exact chat or user display names.
 
-### Identifier Matching
+### 📤 Trigger Output (JSON)
+The trigger payload is clean and production-ready:
+```json
+{
+  "updateType": "message",
+  "message": "Hello world!",
+  "chatId": "-100123456789",
+  "senderName": "Krushnakant",
+  "messageType": "photo",
+  "mediaFiles": [ ... ] 
+}
+```
 
-- Username values can be used with or without `@`.
-- Matching supports:
-  - chat ID / sender ID
-  - chat username/title
-  - sender username/display name
-- Numeric IDs are matched across equivalent forms such as `519...`, `-519...`, and `-100519...`.
-- Exclusion matching uses the same identifier rules as inclusion matching.
+### 🖼️ Binary Media Handling
+- **Automatic Download**: Attached to `binary.data` for `photo`, `video`, and `document`.
+- **Error Resilient**: If a download fails, the node still emits the JSON metadata with a `mediaDownloadError`.
 
-### Trigger Output (Readable)
-
-The trigger payload now emits:
-
-- `updateType`
-- `message`
-- `date` (ISO 8601 UTC)
-- `editDate`
-- `chatName`
-- `chatId`
-- `chatType`
-- `senderName`
-- `senderId`
-- `senderIsBot`
-- `messageId`
-- `isPrivate`
-- `isGroup`
-- `isChannel`
-- `isOutgoing`
-- `messageType` (`text`, `photo`, `video`, `document`, `other`)
-
-Legacy `raw` output is removed.
-
-### Binary Media Output
-
-- `binary.data` is attached only for `photo`, `video`, and `document`.
-- Text/other message types do not include binary.
-- If media download fails, the trigger still emits JSON and adds `mediaDownloadError`.
+---
 
 ## 🎯 Operations Reference
 
-### **Message Operations**
+### ✉️ Message Operations
 
-#### **Send Message**
+#### **Send Message** 📤
 Send text messages to any chat or user with advanced options including binary file upload and media URL support.
 
 **Parameters:**
@@ -118,7 +107,7 @@ Send text messages to any chat or user with advanced options including binary fi
 
 ---
 
-#### **Get Chat History**
+#### **Get Chat History** 📜
 Retrieve messages from a chat with optional time and media filters, enhanced with advanced filtering options.
 
 **Parameters:**
@@ -154,13 +143,14 @@ Retrieve messages from a chat with optional time and media filters, enhanced wit
 
 **Enhanced Features:**
 - **Advanced Filtering**: Filter by specific trigger-compatible message/media types (`text`, `photo`, `video`, `document`, `other`)
+- **Topic Support**: Supports Telegram Thread/Topic URLs as `Chat ID` 🔗
 - **Time Range Support**: Flexible date range and hour-based filtering
 - **Safety Caps**: Maximum message limits to prevent overwhelming responses
 - **Rich Metadata**: Enhanced message information including sender details and timestamps
 
 ---
 
-#### **Copy Message**
+#### **Copy Message** 👯
 Copy a message from one chat to another with optional caption modification and improved error handling.
 
 **Parameters:**
@@ -196,7 +186,7 @@ Copy a message from one chat to another with optional caption modification and i
 
 ---
 
-#### **Edit Message**
+#### **Edit Message** ✏️
 Edit previously sent messages with precision control and enhanced validation.
 
 **Parameters:**
@@ -229,7 +219,7 @@ Edit previously sent messages with precision control and enhanced validation.
 
 ---
 
-#### **Edit Message Media**
+#### **Edit Message Media** 🖼️
 Edit the media content of a message with optional caption and formatting support.
 
 **Parameters:**
@@ -266,7 +256,7 @@ Edit the media content of a message with optional caption and formatting support
 
 ---
 
-#### **Unpin Message**
+#### **Unpin Message** 📌
 Unpin a previously pinned message from a chat with enhanced error handling.
 
 **Parameters:**
@@ -324,7 +314,7 @@ Remove messages from chats with granular control and enhanced security.
 
 ---
 
-#### **Pin Message**
+#### **Pin Message** 📌
 Pin important messages in chats with notification options and enhanced validation.
 
 **Parameters:**
@@ -354,7 +344,7 @@ Pin important messages in chats with notification options and enhanced validatio
 
 ---
 
-#### **Send Poll**
+#### **Send Poll** 📊
 Create interactive polls and quizzes for engagement with enhanced formatting support.
 
 **Parameters:**
@@ -390,7 +380,7 @@ Create interactive polls and quizzes for engagement with enhanced formatting sup
 
 ---
 
-#### **Forward Message**
+#### **Forward Message** ⏩
 Forward messages between chats seamlessly with enhanced error handling.
 
 **Parameters:**
@@ -457,7 +447,7 @@ Handle media that cannot be forwarded normally with download-and-upload fallback
 
 ---
 
-#### **Clear History**
+#### **Clear History** 🧹
 Clear message history from a chat with specialized options for deleting for everyone.
 
 **Parameters:**
@@ -482,7 +472,7 @@ Clear message history from a chat with specialized options for deleting for ever
 
 ---
 
-### **Chat Operations**
+### 💬 Chat Operations
 
 #### **Get Chat Info**
 Retrieve detailed chat information with enhanced metadata.
@@ -592,7 +582,7 @@ Create new chats or groups with custom settings and enhanced validation.
 
 ---
 
-### **User Operations**
+### 👤 User Operations
 
 #### **Get User Profile**
 Get detailed user information including bio and common chats with enhanced privacy handling.
@@ -707,7 +697,7 @@ Download a user's profile photo in different sizes with enhanced quality options
 
 ---
 
-### **Channel Operations**
+### 📢 Channel Operations
 
 #### **Get Participants**
 Get channel participants with filtering options and enhanced metadata.
@@ -928,7 +918,7 @@ Promote a user to admin with customizable permissions and enhanced control.
 
 ---
 
-### **Media Operations**
+### 📂 Media Operations
 
 #### **Download Media**
 Download media files from messages with progress tracking and enhanced error handling.
@@ -959,7 +949,7 @@ Download media files from messages with progress tracking and enhanced error han
 
 ---
 
-### **Authentication Operations**
+### 🔐 Authentication Operations
 
 #### **B1: Phone Login - Request Code**
 Request a verification code to be sent to your phone number with enhanced security.

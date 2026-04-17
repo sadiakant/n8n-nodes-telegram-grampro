@@ -462,10 +462,10 @@ async function requestQrLogin(this: IExecuteFunctions, i: number): Promise<INode
 	let expires: number | undefined;
 	let qrBinary:
 		| {
-			data: string;
-			fileName: string;
-			mimeType: string;
-		}
+				data: string;
+				fileName: string;
+				mimeType: string;
+		  }
 		| undefined;
 
 	try {

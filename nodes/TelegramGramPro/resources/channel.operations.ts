@@ -208,7 +208,7 @@ async function getChannelParticipants(
 
 		const chatParticipants =
 			result.fullChat instanceof Api.ChatFull &&
-				result.fullChat.participants instanceof Api.ChatParticipants
+			result.fullChat.participants instanceof Api.ChatParticipants
 				? result.fullChat.participants.participants
 				: [];
 

@@ -119,7 +119,8 @@ export class TelegramGramProTrigger implements INodeType {
 					{
 						name: 'User Update',
 						value: 'user_update',
-						description: 'Trigger when a user goes online, offline, or changes status (teleproto feature)',
+						description:
+							'Trigger when a user goes online, offline, or changes status (teleproto feature)',
 					},
 				],
 			},

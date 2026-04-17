@@ -1,19 +1,30 @@
+<div align="center">
+
 ![Telegram GramPro Banner](docs/assets/n8n-nodes-telegram-grampro.webp)
 
-# Telegram GramPro - n8n Integration
+# 🚀 Telegram GramPro for n8n
 
-**Powerful Telegram automation for n8n workflows with enterprise-grade security, performance optimization, and comprehensive error handling**
+**The ultimate MTProto automation engine for n8n. Enterprise-grade security, high-performance userbot triggers, and seamless Telegram integration.**
 
-<h4 align="center"> Join Our Telegram Group for Help and Support</h4>
 <p align="center"> 
   <a href="https://t.me/n8n_nodes_0">
-    <img src="./docs/assets/n8n_nodes_0.webp" alt="n8n_nodes_0" width="220" />
+    <img src="./docs/assets/n8n_nodes_0.webp" alt="n8n_nodes_0" width="150" />
   </a>
 </p>
 
+[📖 Operations Guide](./docs/OPERATIONS_GUIDE.md) | [🔐 Auth Guide](./docs/AUTHORIZATION_GUIDE.md) | [🔧 Troubleshooting](./docs/TROUBLESHOOTING_GUIDE.md) | [📝 Logs](./docs/CHANGE_LOG.md) 
+
+---
+
+</div>
+
+## 🌟 Why Telegram GramPro?
+
+Most Telegram n8n nodes use the standard Bot API, which is restricted by Telegram's bot policies. **GramPro** uses the **MTProto protocol** (via Teleproto), allowing you to automate **User Accounts** and **Channels** with the full power of a native Telegram client.
+
 ## 🚀 Transform Your Telegram Automation
 
-Telegram GramPro is a comprehensive n8n custom node that brings the full power of Telegram's MTProto protocol to your automation workflows. Built with GramJS and designed for production use, it offers enterprise-grade features with an intuitive interface.
+Telegram GramPro is a comprehensive n8n custom node that brings the full power of Telegram's MTProto protocol to your automation workflows. Built with **Teleproto** and designed for production use, it offers enterprise-grade features with an intuitive interface.
 
 ### 🌟 **Key Features**
 
@@ -35,8 +46,10 @@ Telegram GramPro is a comprehensive n8n custom node that brings the full power o
 - 🧠 **Smart Caching** - In-memory caching for frequently accessed data with TTL management
 - 🎯 **Input Validation** - Comprehensive validation with detailed error messages and warnings
 
-#### **New Advanced Features**
-
+- **Deleted Message Trigger** - Catch deletions with content recovery via snapshot memory 🗑️
+- **User Update Trigger** - Monitor real-time online/offline status and bio changes 👤
+- **Teleproto Engine** - Migrated to a more stable core to handle massive supergroups 📡
+- **Topic Support** - `Get History` now supports direct Thread/Topic URLs 🔗
 - **Copy Restricted Content** - Handle media that cannot be forwarded normally
 - **Edit Message Media** - Update media content in existing messages with caption support
 - **Enhanced Authentication** - Improved session management with better error handling
@@ -302,22 +315,6 @@ Ready-to-import workflow examples are available in [`docs/Workflows-Examples`](.
 - Regularly rotate session strings
 - Monitor logs for security events
 
-## 🤝 Contributing
-
-We welcome contributions to make Telegram GramPro even better! For comprehensive contributions guidance, see our [Contributions Guide](./docs/CONTRIBUTING.md).
-
-## 📄 License
-
-[MIT License](./LICENSE) - see LICENSE file for details.
-
-## 🔗 Resources
-
-- [Telegram API Documentation](https://core.telegram.org/api)
-- [GramJS Documentation](https://gram.js.org/)
-- [n8n Custom Nodes Guide](https://docs.n8n.io/integrations/creating-nodes/)
-- [Telegram GramPro GitHub](https://github.com/sadiakant/n8n-nodes-telegram-grampro)
-- [NPM Package](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
-
 ## 👥 Contributors
 
 <div align="center">
@@ -335,7 +332,7 @@ We welcome contributions to make Telegram GramPro even better! For comprehensive
   <img src="https://contrib.rocks/image?repo=sadiakant/n8n-nodes-telegram-grampro" />
 </a>
 
-Made with [contrib.rocks](https://contrib.rocks).
+We welcome contributions to make Telegram GramPro even better! For comprehensive contributions guidance, see our [Contributions Guide](./docs/CONTRIBUTING.md).
 
 </div>
 
@@ -390,8 +387,20 @@ Made with [contrib.rocks](https://contrib.rocks).
 [![n8n](https://badgen.net/static/n8n/Community%20Node/EA4B71)](https://n8n.io/)
 [![pnpm >= 9.1](https://img.shields.io/badge/pnpm-%3E%3D9.1-F69220?style=flat-square&logo=pnpm&logoColor=white)](https://pnpm.io/)
 [![Node >= 18.17](https://img.shields.io/badge/node-%3E%3D18.17-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![telegram dependency](https://img.shields.io/badge/telegram-%5E2.26.22-2CA5E0?logo=telegram&logoColor=white)](https://www.npmjs.com/package/telegram)
+[![teleproto dependency](https://img.shields.io/badge/teleproto-%5E1.224.1-2CA5E0?logo=telegram&logoColor=white)](https://www.npmjs.com/package/teleproto)
 [![n8n-workflow peer dependency](https://img.shields.io/npm/dependency-version/n8n-nodes-telegram-grampro/peer/n8n-workflow)](https://www.npmjs.com/package/n8n-workflow)
+
+## 📄 License
+
+[MIT License](./LICENSE) - see LICENSE file for details.
+
+## 🔗 Resources
+
+- [Telegram API Documentation](https://core.telegram.org/api)
+- [Teleproto GitHub](https://github.com/teleproto/teleproto)
+- [n8n Custom Nodes Guide](https://docs.n8n.io/integrations/creating-nodes/)
+- [Telegram GramPro GitHub](https://github.com/sadiakant/n8n-nodes-telegram-grampro)
+- [NPM Package](https://www.npmjs.com/package/n8n-nodes-telegram-grampro)
 
 ---
 

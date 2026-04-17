@@ -1,4 +1,26 @@
 
+## GramPro v6.0.0 [Date: 17-APR-2026] 🚀
+
+This is a major milestone release that migrates the entire engine to **Teleproto** for unprecedented stability and introduces powerful new monitoring capabilities! ✨
+
+### What's New? 🌟
+- **Migration to Teleproto**: We've swapped the core MTProto engine from `telegram` (GramJS) to `teleproto`. This fixes message reception issues in massive supergroups and channels! 📡
+- **New Trigger: Deleted Message**: You can now trigger workflows when messages are deleted! Thanks to our new snapshot-memory, you can even see the *content* of the message that was just removed. 🗑️✨
+- **New Trigger: User Update**: Monitor your contacts' status in real-time. Trigger workflows when someone goes online, offline, or updates their status. 👤🔄
+- **Smart Update Catch-up**: GramPro now automatically catches up on missed updates after a reconnection, ensuring no message is lost. 🎣
+
+### Improvements 🛠️
+- **Advanced History Resolution**: `Get Chat History` now understands Telegram Topic/Thread URLs and deep-links! Just paste the URL and it handles the rest. 🔗
+- **Better Album Support**: Triggers now handle media albums with much better deduplication and grouping. 📸
+- **Enhanced Entity Logic**: Faster and more robust "Peer Resolution" means fewer "Entity Not Found" errors when interacting with new users or groups. 🔍
+
+### Patches & Bug Fixes 🐛
+- **Fixed Copy Message**: Resolved a crash when copying messages that contained only a Link Preview (WebPage) without actual media files. 📄
+- **Fixed Peer Lookups**: Patched several edge cases in `Get Chat History` where numeric IDs were not resolving correctly for certain private entities. 🛠️
+- **Cleaner Logs**: Removed redundant MTProto timeout logs that were cluttering the console during workflow deactivation. 🧹
+
+---
+
 ## GramPro v5.0.5 [Date: 14-APR-2026]
 
 This release finalizes the GramPro user-account trigger and aligns media handling across the node.

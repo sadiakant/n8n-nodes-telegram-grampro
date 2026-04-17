@@ -343,13 +343,13 @@ function detectPeerKind(
 
 	const candidate = peer as
 		| {
-			channelId?: unknown;
-			channel_id?: unknown;
-			chatId?: unknown;
-			chat_id?: unknown;
-			userId?: unknown;
-			user_id?: unknown;
-		}
+				channelId?: unknown;
+				channel_id?: unknown;
+				chatId?: unknown;
+				chat_id?: unknown;
+				userId?: unknown;
+				user_id?: unknown;
+		  }
 		| undefined;
 
 	if (candidate?.channelId !== undefined || candidate?.channel_id !== undefined) return 'channel';
@@ -384,12 +384,12 @@ function isAdminRequiredErrorCode(errorCode: string): boolean {
 function toInputChannel(channelLike: unknown): Api.InputChannel | null {
 	const candidate = channelLike as
 		| {
-			id?: Stringable;
-			channelId?: Stringable;
-			channel_id?: Stringable;
-			accessHash?: Stringable;
-			access_hash?: Stringable;
-		}
+				id?: Stringable;
+				channelId?: Stringable;
+				channel_id?: Stringable;
+				accessHash?: Stringable;
+				access_hash?: Stringable;
+		  }
 		| undefined;
 	if (!candidate) {
 		return null;
@@ -475,7 +475,10 @@ async function* iterMessagesLoose(
 	params: Record<string, unknown>,
 ): AsyncIterable<TelegramMessageView> {
 	const resolvedPeer = await resolvePeer(client, peer);
-	for await (const message of client.iterMessages(resolvedPeer as never, params as never) as unknown as AsyncIterable<TelegramMessageView>) {
+	for await (const message of client.iterMessages(
+		resolvedPeer as never,
+		params as never,
+	) as unknown as AsyncIterable<TelegramMessageView>) {
 		yield message;
 	}
 }
@@ -988,7 +991,10 @@ async function deleteHistory(
 		let preDeleteCount = 0;
 		try {
 			// 'limit: 0' fetches metadata (including total count) without fetching message bodies
-			const countResult = (await client.getMessages(peer as never, { limit: 0 } as never)) as unknown as {
+			const countResult = (await client.getMessages(
+				peer as never,
+				{ limit: 0 } as never,
+			)) as unknown as {
 				total?: number;
 			};
 			preDeleteCount = countResult.total || 0;
@@ -1938,7 +1944,9 @@ async function resolvePeer(client: TelegramClientInstance, rawId: unknown): Prom
 			}
 
 			// Reject blind InputPeerChat creation if it was guessed from a positive ID alias
-			const isInputChat = result.className === 'InputPeerChat' || (result as unknown as { _?: string })._ === 'inputPeerChat';
+			const isInputChat =
+				result.className === 'InputPeerChat' ||
+				(result as unknown as { _?: string })._ === 'inputPeerChat';
 			if (isInputChat && /^\d+$/.test(asString)) {
 				throw new Error('Dummy InputPeerChat parsed from positive string; requires dialog search');
 			}
@@ -1965,8 +1973,8 @@ async function resolvePeer(client: TelegramClientInstance, rawId: unknown): Prom
 	if (/^\d+$/.test(asString)) {
 		throw new Error(
 			`Could not resolve Telegram entity for numeric ID ${asString}. ` +
-			`If this is a channel/group from a previous node, pass its full chat ID (for example -100${asString}) or make sure it appears in this account's dialog list. ` +
-			`If this is a user, Telegram also requires a cached access hash, so use their @username or interact with them first.`,
+				`If this is a channel/group from a previous node, pass its full chat ID (for example -100${asString}) or make sure it appears in this account's dialog list. ` +
+				`If this is a user, Telegram also requires a cached access hash, so use their @username or interact with them first.`,
 		);
 	}
 

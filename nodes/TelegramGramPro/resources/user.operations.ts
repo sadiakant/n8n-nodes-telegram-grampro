@@ -369,12 +369,12 @@ export async function getProfilePhoto(
 				} as IDataObject,
 				binary: photoData
 					? {
-						photo: {
-							data: photoData.toString('base64'),
-							mimeType: 'image/jpeg',
-							fileName: `profile_photo_${user.id}_${photoSize}.jpg`,
-						},
-					}
+							photo: {
+								data: photoData.toString('base64'),
+								mimeType: 'image/jpeg',
+								fileName: `profile_photo_${user.id}_${photoSize}.jpg`,
+							},
+						}
 					: undefined,
 				pairedItem: { item: i },
 			},

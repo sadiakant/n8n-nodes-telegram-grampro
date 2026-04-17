@@ -54,7 +54,7 @@ function cleanupStaleConnections(): void {
 			logger.info(
 				`[ClientManager] Auto-disconnecting idle client (no event handlers, idle ${Math.round((now - lastUsed) / 1000)}s): ${key}`,
 			);
-			gracefulDestroy(client).catch(() => { });
+			gracefulDestroy(client).catch(() => {});
 			clients.delete(key);
 			clientLastUsed.delete(key);
 		}
