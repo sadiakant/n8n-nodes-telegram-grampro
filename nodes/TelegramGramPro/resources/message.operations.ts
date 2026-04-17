@@ -29,6 +29,8 @@ type TelegramPeerRef = {
 
 type TelegramEntityView = {
 	id?: Stringable;
+	accessHash?: Stringable;
+	access_hash?: Stringable;
 	className?: string;
 	_?: string;
 	title?: string;
@@ -37,6 +39,15 @@ type TelegramEntityView = {
 	lastName?: string;
 	broadcast?: boolean;
 	megagroup?: boolean;
+	creator?: boolean;
+	adminRights?: {
+		deleteMessages?: boolean;
+		delete_messages?: boolean;
+	} | null;
+	admin_rights?: {
+		deleteMessages?: boolean;
+		delete_messages?: boolean;
+	} | null;
 };
 
 type TelegramDocumentAttributeView = {
@@ -312,6 +323,88 @@ function matchesEntityReference(entity: TelegramEntityView, rawReference: string
 	const entityAliases = getEntityReferenceAliases(entity);
 
 	return inputAliases.some((candidate) => entityAliases.has(candidate));
+}
+
+function isChannelEntity(entity: TelegramEntityView | null | undefined): boolean {
+	return !!entity && (entity.className === 'Channel' || entity._ === 'channel');
+}
+
+function isChatEntity(entity: TelegramEntityView | null | undefined): boolean {
+	return !!entity && (entity.className === 'Chat' || entity._ === 'chat');
+}
+
+function detectPeerKind(
+	entity: TelegramEntityView | null,
+	peer: unknown,
+): 'channel' | 'chat' | 'user' | 'unknown' {
+	if (isChannelEntity(entity)) return 'channel';
+	if (isChatEntity(entity)) return 'chat';
+	if (entity && (entity.className === 'User' || entity._ === 'user')) return 'user';
+
+	const candidate = peer as
+		| {
+			channelId?: unknown;
+			channel_id?: unknown;
+			chatId?: unknown;
+			chat_id?: unknown;
+			userId?: unknown;
+			user_id?: unknown;
+		}
+		| undefined;
+
+	if (candidate?.channelId !== undefined || candidate?.channel_id !== undefined) return 'channel';
+	if (candidate?.chatId !== undefined || candidate?.chat_id !== undefined) return 'chat';
+	if (candidate?.userId !== undefined || candidate?.user_id !== undefined) return 'user';
+	return 'unknown';
+}
+
+function canDeleteHistoryForEveryone(entity: TelegramEntityView | null): boolean | null {
+	if (!entity) return null;
+	if (entity.creator) return true;
+
+	const rights = entity.adminRights || entity.admin_rights;
+	if (!rights) return false;
+
+	return !!(rights.deleteMessages || rights.delete_messages);
+}
+
+function getRpcErrorCode(message: string): string {
+	const errorCodeMatch = message.match(/\b[A-Z_]{3,}\b/);
+	return errorCodeMatch?.[0] || 'DELETE_HISTORY_FAILED';
+}
+
+function isAdminRequiredErrorCode(errorCode: string): boolean {
+	return (
+		errorCode === 'CHAT_ADMIN_REQUIRED' ||
+		errorCode === 'RIGHT_FORBIDDEN' ||
+		errorCode === 'MESSAGE_DELETE_FORBIDDEN'
+	);
+}
+
+function toInputChannel(channelLike: unknown): Api.InputChannel | null {
+	const candidate = channelLike as
+		| {
+			id?: Stringable;
+			channelId?: Stringable;
+			channel_id?: Stringable;
+			accessHash?: Stringable;
+			access_hash?: Stringable;
+		}
+		| undefined;
+	if (!candidate) {
+		return null;
+	}
+
+	const rawChannelId = candidate.channelId ?? candidate.channel_id ?? candidate.id;
+	const rawAccessHash = candidate.accessHash ?? candidate.access_hash;
+	if (rawChannelId === undefined || rawAccessHash === undefined) {
+		return null;
+	}
+
+	return new Api.InputChannel({
+		channelId: toBigIntValue(rawChannelId),
+		accessHash: toBigIntValue(rawAccessHash),
+	});
 }
 
 async function editMessageLoose(
@@ -696,13 +789,200 @@ async function deleteHistory(
 	const chatId = this.getNodeParameter('chatId', i) as string;
 	const maxId = (this.getNodeParameter('maxId', i) as number) || 0;
 	const revoke = this.getNodeParameter('revoke', i) as boolean;
+	const normalizedChatId = String(normalizePeerReference(chatId) ?? chatId).trim();
 
 	try {
+		if (!normalizedChatId) {
+			return [
+				{
+					json: {
+						success: false,
+						chatId,
+						normalizedChatId,
+						errorCode: 'INVALID_CHAT_ID',
+						error:
+							'Chat ID is empty or invalid. Provide a numeric chat ID, @username, or a valid t.me link.',
+						operation: 'deleteHistory',
+						recoverable: true,
+					},
+					pairedItem: { item: i },
+				},
+			];
+		}
+
 		if (!client.connected) {
 			await client.connect();
 		}
 
-		const peer = await resolvePeer(client, chatId);
+		const peer = await resolvePeer(client, normalizedChatId);
+		let entity: TelegramEntityView | null = null;
+		try {
+			entity = await getEntityLoose(client, normalizedChatId);
+		} catch {
+			// Best effort only; some peers may resolve as input entities without full metadata.
+		}
+		const peerKind = detectPeerKind(entity, peer);
+
+		// Channel/supergroup handling:
+		// - revoke=false: clear locally (like app "clear history") via messages.DeleteHistory(justClear=true)
+		// - revoke=true: delete for everyone via channels.DeleteHistory (admin-only)
+		if (peerKind === 'channel') {
+			let channelInput = toInputChannel(entity as unknown) || toInputChannel(peer);
+			if (!channelInput) {
+				try {
+					channelInput = toInputChannel(await client.getInputEntity(normalizedChatId as never));
+				} catch {
+					// Keep null; handled below with friendly CHANNEL_RESOLVE_FAILED message.
+				}
+			}
+
+			if (!revoke) {
+				try {
+					await client.invoke(
+						new Api.channels.DeleteHistory({
+							channel: channelInput as never,
+							maxId: maxId,
+							forEveryone: false,
+						}),
+					);
+
+					return [
+						{
+							json: {
+								success: true,
+								chatId,
+								normalizedChatId,
+								deletedCount: null,
+								maxId: maxId,
+								revoked: false,
+								peerKind,
+								strategy: 'channels.DeleteHistory(local-clear)',
+							},
+							pairedItem: { item: i },
+						},
+					];
+				} catch (localError) {
+					const localMessage =
+						localError instanceof Error ? localError.message : String(localError);
+					const localErrorCode = getRpcErrorCode(localMessage);
+
+					return [
+						{
+							json: {
+								success: false,
+								chatId,
+								normalizedChatId,
+								errorCode: localErrorCode,
+								error: localMessage,
+								operation: 'deleteHistory',
+								recoverable: true,
+								peerKind,
+								strategy: 'channels.DeleteHistory(local-clear)',
+								hint:
+									localErrorCode === 'PEER_ID_INVALID'
+										? 'This account could not resolve a valid InputPeer for local clear. Open this channel once in Telegram app and retry, or pass @username instead of numeric ID.'
+										: 'Telegram did not allow local channel history clear for this chat.',
+							},
+							pairedItem: { item: i },
+						},
+					];
+				}
+			}
+
+			const everyonePermission = canDeleteHistoryForEveryone(entity);
+			if (everyonePermission === false) {
+				return [
+					{
+						json: {
+							success: false,
+							chatId,
+							normalizedChatId,
+							errorCode: 'ADMIN_REQUIRED',
+							error:
+								'Delete for Everyone requires channel/supergroup admin rights (delete messages). Turn off Delete for Everyone to clear only your own history.',
+							operation: 'deleteHistory',
+							recoverable: true,
+							hint: 'Set "Delete for Everyone" to false, or run with an admin account.',
+						},
+						pairedItem: { item: i },
+					},
+				];
+			}
+
+			if (!channelInput) {
+				return [
+					{
+						json: {
+							success: false,
+							chatId,
+							normalizedChatId,
+							errorCode: 'CHANNEL_RESOLVE_FAILED',
+							error:
+								'Unable to build InputChannel with access hash for this channel. Open the channel once and retry.',
+							operation: 'deleteHistory',
+							recoverable: true,
+							peerKind,
+							strategy: 'channels.DeleteHistory',
+						},
+						pairedItem: { item: i },
+					},
+				];
+			}
+
+			try {
+				await client.invoke(
+					new Api.channels.DeleteHistory({
+						channel: channelInput as never,
+						maxId: maxId,
+						forEveryone: true,
+					}),
+				);
+
+				return [
+					{
+						json: {
+							success: true,
+							chatId,
+							normalizedChatId,
+							deletedCount: null,
+							maxId: maxId,
+							revoked: revoke,
+							peerKind,
+							strategy: 'channels.DeleteHistory',
+						},
+						pairedItem: { item: i },
+					},
+				];
+			} catch (channelError) {
+				const channelMessage =
+					channelError instanceof Error ? channelError.message : String(channelError);
+				const channelErrorCode = getRpcErrorCode(channelMessage);
+				const isAdminError =
+					isAdminRequiredErrorCode(channelErrorCode) ||
+					(channelErrorCode === 'CHANNEL_INVALID' && revoke && !!entity);
+
+				return [
+					{
+						json: {
+							success: false,
+							chatId,
+							normalizedChatId,
+							errorCode: isAdminError ? 'ADMIN_REQUIRED' : channelErrorCode,
+							error: channelMessage,
+							operation: 'deleteHistory',
+							recoverable: true,
+							peerKind,
+							strategy: 'channels.DeleteHistory',
+							hint:
+								isAdminError || (revoke && channelErrorCode === 'PEER_ID_INVALID')
+									? 'Delete for Everyone needs admin rights. Set "Delete for Everyone" to false to clear only your side.'
+									: 'If this channel is private, ensure this account is a member and can open it in Telegram app.',
+						},
+						pairedItem: { item: i },
+					},
+				];
+			}
+		}
 
 		// 1. GET TOTAL COUNT BEFORE DELETION
 		let preDeleteCount = 0;
@@ -722,14 +1002,49 @@ async function deleteHistory(
 
 		// 2. PERFORM DELETION
 		do {
-			response = (await client.invoke(
-				new Api.messages.DeleteHistory({
-					peer: peer as never,
-					maxId: maxId,
-					revoke: revoke,
-					justClear: false,
-				}),
-			)) as Api.messages.AffectedHistory;
+			try {
+				response = (await client.invoke(
+					new Api.messages.DeleteHistory({
+						peer: peer as never,
+						maxId: maxId,
+						revoke: revoke,
+						justClear: false,
+					}),
+				)) as Api.messages.AffectedHistory;
+			} catch (messagesError) {
+				const messagesErrorMessage =
+					messagesError instanceof Error ? messagesError.message : String(messagesError);
+				const messagesErrorCode = getRpcErrorCode(messagesErrorMessage);
+
+				// Fallback: if peer was detected/treated as channel, retry with channel API.
+				if (messagesErrorCode === 'PEER_ID_INVALID' && peerKind === 'unknown') {
+					await client.invoke(
+						new Api.channels.DeleteHistory({
+							channel: peer as never,
+							maxId: maxId,
+							forEveryone: revoke,
+						}),
+					);
+					return [
+						{
+							json: {
+								success: true,
+								chatId,
+								normalizedChatId,
+								deletedCount: null,
+								maxId: maxId,
+								revoked: revoke,
+								iterations: 1,
+								peerKind: 'channel',
+								strategy: 'channels.DeleteHistory(fallback)',
+							},
+							pairedItem: { item: i },
+						},
+					];
+				}
+
+				throw messagesError;
+			}
 
 			offset = response.offset;
 			loopCount++;
@@ -746,25 +1061,48 @@ async function deleteHistory(
 			{
 				json: {
 					success: true,
+					chatId,
+					normalizedChatId,
 					deletedCount: preDeleteCount,
 					maxId: maxId,
 					revoked: revoke,
 					iterations: loopCount,
+					peerKind,
+					strategy: 'messages.DeleteHistory',
 				},
 				pairedItem: { item: i },
 			},
 		];
 	} catch (error) {
-		if (this.continueOnFail()) {
-			return [
-				{
-					json: { success: false, error: (error as Error).message },
-					pairedItem: { item: i },
+		const message = error instanceof Error ? error.message : String(error);
+		const errorCode = getRpcErrorCode(message);
+		const isPeerResolutionIssue =
+			errorCode === 'PEER_ID_INVALID' ||
+			message.toLowerCase().includes('could not resolve telegram entity');
+		const isAdminError =
+			errorCode === 'CHAT_ADMIN_REQUIRED' ||
+			errorCode === 'RIGHT_FORBIDDEN' ||
+			errorCode === 'MESSAGE_DELETE_FORBIDDEN';
+
+		return [
+			{
+				json: {
+					success: false,
+					chatId,
+					normalizedChatId,
+					errorCode: isAdminError ? 'ADMIN_REQUIRED' : errorCode,
+					error: message,
+					operation: 'deleteHistory',
+					recoverable: true,
+					hint: isAdminError
+						? 'You do not have permission to delete for everyone in this chat. Set "Delete for Everyone" to false.'
+						: isPeerResolutionIssue
+							? 'Make sure this account has access to the target chat. Try @username or open the chat once so Telegram can cache entity access.'
+							: undefined,
 				},
-			];
-		} else {
-			throw error;
-		}
+				pairedItem: { item: i },
+			},
+		];
 	}
 }
 
@@ -1591,20 +1929,33 @@ async function resolvePeer(client: TelegramClientInstance, rawId: unknown): Prom
 	const candidates = getInputReferenceAliases(asString);
 
 	let initialError: unknown;
-	for (const candidate of candidates) {
-		try {
-			return await client.getInputEntity(candidate as never);
-		} catch (error) {
-			initialError = error;
+	try {
+		const result = await client.getInputEntity(asString as never);
+		// Many teleproto methods return dummy entities with accessHash=0 when unresolvable
+		if (result && typeof result === 'object') {
+			if ('accessHash' in result && String(result.accessHash) === '0') {
+				throw new Error('Dummy entity with 0 accessHash resolved; requires dialog search');
+			}
+
+			// Reject blind InputPeerChat creation if it was guessed from a positive ID alias
+			const isInputChat = result.className === 'InputPeerChat' || (result as unknown as { _?: string })._ === 'inputPeerChat';
+			if (isInputChat && /^\d+$/.test(asString)) {
+				throw new Error('Dummy InputPeerChat parsed from positive string; requires dialog search');
+			}
 		}
+		return result;
+	} catch (error) {
+		initialError = error;
 	}
 
 	try {
 		// Fallback: walk through dialogs to find a matching peer by id/username
 		for await (const dialog of iterDialogsLoose(client, { limit: 5000 })) {
 			const entity = (dialog.entity || dialog) as TelegramEntityView;
-			if (matchesEntityReference(entity, asString)) {
-				return await client.getInputEntity(entity as never);
+			for (const candidate of candidates) {
+				if (matchesEntityReference(entity, candidate)) {
+					return await client.getInputEntity(entity as never);
+				}
 			}
 		}
 	} catch {

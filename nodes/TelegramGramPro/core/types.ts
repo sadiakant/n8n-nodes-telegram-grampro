@@ -42,6 +42,10 @@ export interface TelegramTriggerPayload extends IDataObject {
 	senderId?: string | null;
 	senderIsBot?: boolean | null;
 	messageId?: string;
+	userId?: string;
+	user?: IDataObject;
+	status?: IDataObject;
+	action?: IDataObject;
 	isPrivate?: boolean;
 	isGroup?: boolean;
 	isChannel?: boolean;

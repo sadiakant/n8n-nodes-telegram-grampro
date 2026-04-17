@@ -17,6 +17,19 @@ type SentCodeDetails = {
 	timeout?: number;
 };
 
+function getOptionalPasswordParam(
+	executor: IExecuteFunctions,
+	paramName: string,
+	itemIndex: number,
+): string {
+	const rawValue = executor.getNodeParameter(paramName, itemIndex, '');
+	if (typeof rawValue !== 'string') return '';
+	const normalized = rawValue.trim();
+	if (!normalized) return '';
+	if (normalized.toLowerCase() === 'undefined' || normalized.toLowerCase() === 'null') return '';
+	return rawValue;
+}
+
 const SENT_CODE_TYPE_MAP: Record<string, string> = {
 	'auth.SentCodeTypeApp': 'app',
 	'auth.SentCodeTypeSms': 'sms',
@@ -233,7 +246,7 @@ async function requestCode(this: IExecuteFunctions, i: number): Promise<INodeExe
 
 	const apiHash = this.getNodeParameter('apiHash', i) as string;
 	const phoneNumber = this.getNodeParameter('phoneNumber', i) as string;
-	const password2fa = (this.getNodeParameter('password2fa', i, '') as string).trim();
+	const password2fa = getOptionalPasswordParam(this, 'password2fa', i);
 
 	const client = new TelegramClient(new StringSession(''), apiId, apiHash, {
 		connectionRetries: 1,
@@ -352,7 +365,7 @@ async function resendCode(this: IExecuteFunctions, i: number): Promise<INodeExec
 	const phoneNumber = this.getNodeParameter('phoneNumber', i) as string;
 	const phoneCodeHash = this.getNodeParameter('phoneCodeHash', i) as string;
 	const preAuthSession = this.getNodeParameter('preAuthSession', i) as string;
-	const password2fa = (this.getNodeParameter('password2fa', i, '') as string).trim();
+	const password2fa = getOptionalPasswordParam(this, 'password2fa', i);
 
 	const client = new TelegramClient(new StringSession(preAuthSession), apiId, apiHash, {
 		connectionRetries: 1,
@@ -562,7 +575,7 @@ async function completeQrLogin(this: IExecuteFunctions, i: number): Promise<INod
 
 	const apiHash = this.getNodeParameter('apiHash', i) as string;
 	const preAuthSession = this.getNodeParameter('preAuthSession', i) as string;
-	const password2fa = (this.getNodeParameter('password2fa', i, '') as string).trim();
+	const password2fa = getOptionalPasswordParam(this, 'password2fa', i);
 
 	let client = new TelegramClient(new StringSession(preAuthSession), apiId, apiHash, {
 		connectionRetries: 1,
@@ -732,7 +745,7 @@ async function signIn(this: IExecuteFunctions, i: number): Promise<INodeExecutio
 	const phoneCode = this.getNodeParameter('phoneCode', i) as string;
 	const phoneCodeHash = this.getNodeParameter('phoneCodeHash', i) as string;
 	const preAuthSession = this.getNodeParameter('preAuthSession', i) as string;
-	const password2fa = (this.getNodeParameter('password2fa', i, '') as string).trim();
+	const password2fa = getOptionalPasswordParam(this, 'password2fa', i);
 
 	const client = new TelegramClient(new StringSession(preAuthSession), apiId, apiHash, {
 		connectionRetries: 1,

@@ -1,4 +1,5 @@
 import { Api } from 'teleproto';
+import type { UserUpdateEvent } from 'teleproto/events/UserUpdate';
 import type {
 	IBinaryData,
 	IDataObject,
@@ -141,6 +142,104 @@ export function buildSharedAlbumPayload(
 	messageContext: MessageContext,
 ): TelegramTriggerPayload {
 	return buildAlbumTriggerPayload(undefined, messages, messageContext);
+}
+
+export async function buildUserUpdatePayload(
+	event: UserUpdateEvent,
+): Promise<TelegramTriggerPayload> {
+	const user = await event.getUser().catch(() => undefined);
+	const statusClassName = getTelegramClassName(event.status);
+	const actionClassName = getTelegramClassName(event.action);
+	const userId = normalizeString(event.userId);
+	const chatId = getUserUpdateChatId(event.originalUpdate);
+	const chatType = detectUserUpdateChatType(event.originalUpdate);
+	const chatName = user ? getEntityLabel(user) : chatId;
+	const senderName = user ? getEntityLabel(user) : userId;
+	const statusExpires =
+		event.status instanceof Api.UserStatusOnline ? toUnixNumber(event.status.expires) : undefined;
+	const statusWasOnline =
+		event.status instanceof Api.UserStatusOffline
+			? toUnixNumber(event.status.wasOnline)
+			: undefined;
+	const statusByMe =
+		event.status instanceof Api.UserStatusRecently ||
+		event.status instanceof Api.UserStatusLastWeek ||
+		event.status instanceof Api.UserStatusLastMonth
+			? (event.status.byMe ?? undefined)
+			: undefined;
+
+	const payload: TelegramTriggerPayload = {
+		updateType: 'user_update',
+		date: toIsoDate(new Date()),
+		chatName,
+		chatId,
+		chatType,
+		senderName,
+		senderId: userId,
+		senderIsBot: user instanceof Api.User ? Boolean(user.bot) : null,
+		isPrivate: chatType === 'user' || chatType === 'bot',
+		isGroup: chatType === 'group' || chatType === 'supergroup',
+		isChannel: chatType === 'channel',
+		messageType: 'other',
+		hasMedia: false,
+		raw: {
+			eventName: event._eventName,
+			originalUpdateType: getTelegramClassName(event.originalUpdate),
+		},
+	};
+
+	payload.userId = userId ?? undefined;
+	payload.user = {
+		id: userId,
+		username: user instanceof Api.User ? (user.username ?? null) : null,
+		firstName: user instanceof Api.User ? (user.firstName ?? null) : null,
+		lastName: user instanceof Api.User ? (user.lastName ?? null) : null,
+		phone: user instanceof Api.User ? (user.phone ?? null) : null,
+		isBot: user instanceof Api.User ? Boolean(user.bot) : null,
+		isVerified: user instanceof Api.User ? Boolean(user.verified) : null,
+		isScam: user instanceof Api.User ? Boolean(user.scam) : null,
+		isFake: user instanceof Api.User ? Boolean(user.fake) : null,
+		isPremium: user instanceof Api.User ? Boolean(user.premium) : null,
+		isSupport: user instanceof Api.User ? Boolean(user.support) : null,
+		isMutualContact: user instanceof Api.User ? Boolean(user.mutualContact) : null,
+		isContact: user instanceof Api.User ? Boolean(user.contact) : null,
+		isDeleted: user instanceof Api.User ? Boolean(user.deleted) : null,
+		langCode: user instanceof Api.User ? (user.langCode ?? null) : null,
+	};
+
+	payload.status = {
+		className: statusClassName,
+		online: event.online,
+		offline: event.offline,
+		recently: event.recently,
+		withinWeeks: event.withinWeeks,
+		withinMonths: event.withinMonths,
+		expires: statusExpires,
+		expiresAt: event.until ? event.until.toISOString() : null,
+		wasOnline: statusWasOnline,
+		lastSeenAt: event.lastSeen ? event.lastSeen.toISOString() : null,
+		byMe: statusByMe,
+	};
+
+	payload.action = {
+		className: actionClassName,
+		typing: event.typing,
+		cancel: event.cancel,
+		recording: event.recording,
+		uploading: event.uploading,
+		audio: event.audio,
+		video: event.video,
+		round: event.round,
+		photo: event.photo,
+		document: event.document,
+		geo: event.geo,
+		contact: event.contact,
+		playing: event.playing,
+		sticker: event.sticker,
+		uploadProgress: event.uploadProgress,
+	};
+
+	return payload;
 }
 
 export async function resolveMessageContext(message: Api.Message): Promise<MessageContext> {
@@ -590,6 +689,38 @@ function normalizeString(value: unknown): string | null {
 function normalizeGroupedId(value: unknown): string | undefined {
 	const s = normalizeString(value);
 	return s ?? undefined;
+}
+
+function getTelegramClassName(value: unknown): string | null {
+	if (!value || typeof value !== 'object') return null;
+	const maybeClassName = (value as { className?: unknown }).className;
+	return typeof maybeClassName === 'string' ? maybeClassName : null;
+}
+
+function getUserUpdateChatId(originalUpdate: unknown): string | null {
+	if (originalUpdate instanceof Api.UpdateChatUserTyping)
+		return normalizeString(originalUpdate.chatId);
+	if (originalUpdate instanceof Api.UpdateChannelUserTyping)
+		return normalizeString(originalUpdate.channelId);
+	return normalizeString(
+		originalUpdate instanceof Api.UpdateUserStatus ? originalUpdate.userId : null,
+	);
+}
+
+function detectUserUpdateChatType(originalUpdate: unknown): TelegramTriggerChatType {
+	if (originalUpdate instanceof Api.UpdateChatUserTyping) return 'group';
+	if (originalUpdate instanceof Api.UpdateChannelUserTyping) return 'channel';
+	return 'user';
+}
+
+function toUnixNumber(value: unknown): number | undefined {
+	if (typeof value === 'number') return value;
+	if (typeof value === 'bigint') return Number(value);
+	if (typeof value === 'object' && value !== null && 'toString' in value) {
+		const numericValue = Number(value.toString());
+		return Number.isFinite(numericValue) ? numericValue : undefined;
+	}
+	return undefined;
 }
 
 function getMessageText(message: Api.Message): string {

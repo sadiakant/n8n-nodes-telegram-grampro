@@ -15,7 +15,12 @@ type ParameterContext = Pick<ITriggerFunctions, 'getNode' | 'getNodeParameter' |
 
 export type ListeningMode = 'incoming' | 'outgoing';
 
-const ALL_UPDATES: SupportedUpdate[] = ['message', 'edited_message'];
+const ALL_UPDATES: SupportedUpdate[] = [
+	'message',
+	'edited_message',
+	'deleted_message',
+	'user_update',
+];
 const ALL_LISTENING_MODES: ListeningMode[] = ['incoming', 'outgoing'];
 const DEDUPE_TTL_MS = 10 * 60 * 1000;
 
@@ -41,15 +46,29 @@ export function parseTriggerConfig(this: ITriggerFunctions): TriggerConfig {
 	const listeningMode = normalizeListeningModes(this.getNodeParameter('listeningMode', []));
 	const disableBinary = this.getNodeParameter('disableBinary', false) as boolean;
 
-	const filterMode = this.getNodeParameter('filterMode', 'all') as string;
-	const allMessages = filterMode === 'all';
-	const onlyUserMessages = filterMode === 'onlyPrivate';
-	const onlyChannelMessages = filterMode === 'onlyChannels';
-	const onlyGroupMessages = filterMode === 'onlyGroups';
+	const filterMode = this.getNodeParameter('filterMode', '') as string;
+	const hasFilterMode = typeof filterMode === 'string' && filterMode.length > 0;
+	const allMessages = hasFilterMode
+		? filterMode === 'all'
+		: (this.getNodeParameter('allMessages', true) as boolean);
+	const onlyUserMessages = hasFilterMode
+		? filterMode === 'onlyPrivate'
+		: (this.getNodeParameter('onlyUserMessages', false) as boolean);
+	const onlyChannelMessages = hasFilterMode
+		? filterMode === 'onlyChannels'
+		: (this.getNodeParameter('onlyChannelMessages', false) as boolean);
+	const onlyGroupMessages = hasFilterMode
+		? filterMode === 'onlyGroups'
+		: (this.getNodeParameter('onlyGroupMessages', false) as boolean);
 
-	const chatFilterModel = this.getNodeParameter('chatFilterMode', 'none') as string;
-	const selectedChatsOnly = chatFilterModel === 'include';
-	const exceptSelectedChatsOnly = chatFilterModel === 'exclude';
+	const chatFilterMode = this.getNodeParameter('chatFilterMode', '') as string;
+	const hasChatFilterMode = typeof chatFilterMode === 'string' && chatFilterMode.length > 0;
+	const selectedChatsOnly = hasChatFilterMode
+		? chatFilterMode === 'include'
+		: (this.getNodeParameter('selectedChatsOnly', false) as boolean);
+	const exceptSelectedChatsOnly = hasChatFilterMode
+		? chatFilterMode === 'exclude'
+		: (this.getNodeParameter('exceptSelectedChatsOnly', false) as boolean);
 
 	let selectedChats: string[] = [];
 	if (selectedChatsOnly) {

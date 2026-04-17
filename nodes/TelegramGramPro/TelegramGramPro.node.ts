@@ -777,7 +777,8 @@ export class TelegramGramPro implements INodeType {
 						operation: ['deleteMessage', 'deleteHistory'],
 					},
 				},
-				description: 'Whether to delete message(s) for everyone',
+				description:
+					'Whether to delete message(s) for everyone. In channels/supergroups, this usually requires admin delete permission.',
 			},
 
 			{

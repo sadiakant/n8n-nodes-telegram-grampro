@@ -22,7 +22,8 @@ import type { UserUpdateEvent } from 'teleproto/events/UserUpdate';
 import { testTelegramApi } from '../../credentials/TelegramGramProApi.credentials';
 import { disconnectClient, getClient } from '../TelegramGramPro/core/clientManager';
 import { logger } from '../TelegramGramPro/core/logger';
-import type { TelegramCredentials } from '../TelegramGramPro/core/types';
+import { buildUserUpdatePayload } from '../TelegramGramPro/core/payloadBuilders';
+import type { TelegramCredentials, TelegramTriggerPayload } from '../TelegramGramPro/core/types';
 import {
 	buildTriggerPayload,
 	buildAlbumTriggerPayload,
@@ -41,6 +42,11 @@ type RegisteredHandler = {
 	event: NewMessage | EditedMessage | Album | DeletedMessage | UserUpdate;
 	handler: (...args: unknown[]) => void;
 };
+
+type MessageSnapshotStore = ReturnType<typeof createMessageSnapshotStore>;
+
+const MESSAGE_SNAPSHOT_TTL_MS = 6 * 60 * 60 * 1000;
+const MESSAGE_SNAPSHOT_MAX_SIZE = 5000;
 
 export class TelegramGramProTrigger implements INodeType {
 	description: INodeTypeDescription = {
@@ -280,6 +286,7 @@ export class TelegramGramProTrigger implements INodeType {
 		}
 
 		const dedupe = createDedupeTracker();
+		const messageSnapshots = createMessageSnapshotStore();
 		const handlers: RegisteredHandler[] = [];
 
 		for (const updateType of config.updates) {
@@ -292,6 +299,7 @@ export class TelegramGramProTrigger implements INodeType {
 				client,
 				config,
 				dedupe,
+				messageSnapshots,
 			);
 
 			client.addEventHandler(registration.handler, registration.event);
@@ -306,11 +314,58 @@ export class TelegramGramProTrigger implements INodeType {
 					client,
 					config,
 					dedupe,
+					messageSnapshots,
 				);
 
 				client.addEventHandler(albumRegistration.handler, albumRegistration.event);
 				handlers.push(albumRegistration);
 			}
+		}
+
+		const includesDeleted = config.updates.includes('deleted_message');
+		const includesMessage = config.updates.includes('message');
+		const includesEdited = config.updates.includes('edited_message');
+
+		if (includesDeleted && !includesMessage) {
+			const cacheMessageRegistration = createRegistration(
+				'message',
+				async () => {},
+				this,
+				client,
+				config,
+				dedupe,
+				messageSnapshots,
+				false,
+			);
+			client.addEventHandler(cacheMessageRegistration.handler, cacheMessageRegistration.event);
+			handlers.push(cacheMessageRegistration);
+
+			const cacheAlbumRegistration = createAlbumRegistration(
+				async () => {},
+				this,
+				client,
+				config,
+				dedupe,
+				messageSnapshots,
+				false,
+			);
+			client.addEventHandler(cacheAlbumRegistration.handler, cacheAlbumRegistration.event);
+			handlers.push(cacheAlbumRegistration);
+		}
+
+		if (includesDeleted && !includesEdited) {
+			const cacheEditedRegistration = createRegistration(
+				'edited_message',
+				async () => {},
+				this,
+				client,
+				config,
+				dedupe,
+				messageSnapshots,
+				false,
+			);
+			client.addEventHandler(cacheEditedRegistration.handler, cacheEditedRegistration.event);
+			handlers.push(cacheEditedRegistration);
 		}
 
 		logger.info('[TelegramGramProTrigger] Trigger activated', {
@@ -365,6 +420,8 @@ function createRegistration(
 	client: Awaited<ReturnType<typeof getClient>>,
 	config: ReturnType<typeof parseTriggerConfig>,
 	dedupe: ReturnType<typeof createDedupeTracker>,
+	messageSnapshots: MessageSnapshotStore,
+	emitEvents = true,
 ): RegisteredHandler {
 	const processEvent = async (
 		event: NewMessageEvent | EditedMessageEvent,
@@ -376,7 +433,7 @@ function createRegistration(
 				return;
 			}
 
-			if (currentUpdateType === 'message' && message.groupedId) {
+			if (currentUpdateType === 'message' && message.groupedId && emitEvents) {
 				return;
 			}
 
@@ -386,11 +443,15 @@ function createRegistration(
 			}
 
 			const messageContext = await resolveMessageContext(message);
+			const payload = buildTriggerPayload(currentUpdateType, message, messageContext);
+			messageSnapshots.remember(payload);
+
+			if (!emitEvents) {
+				return;
+			}
 			if (!shouldProcessMessage(message, messageContext, config)) {
 				return;
 			}
-
-			const payload = buildTriggerPayload(currentUpdateType, message, messageContext);
 			const item = await createExecutionItem(context, message, payload, config.disableBinary);
 			await emit([item]);
 		} catch (error) {
@@ -417,13 +478,19 @@ function createRegistration(
 	if (updateType === 'deleted_message') {
 		const event = new DeletedMessage({});
 		const handler = (...args: unknown[]): void => {
-			const deletedEvent = args[0] as DeletedMessageEvent;
-			const payload = {
-				updateType: 'deleted_message' as const,
-				deletedIds: deletedEvent.deletedIds ?? [],
-				channelId: deletedEvent.peer ? String(deletedEvent.peer) : undefined,
-			};
-			void emit([{ json: payload as unknown as IDataObject }]);
+			void (async () => {
+				const deletedEvent = args[0] as DeletedMessageEvent;
+				try {
+					const payload = await buildDeletedMessagePayload(deletedEvent, messageSnapshots, client);
+					await emit([{ json: payload as unknown as IDataObject }]);
+				} catch (error) {
+					logger.error('[TelegramGramProTrigger] Failed to process deleted message update', {
+						error: getErrorMessage(error),
+						updateType: 'deleted_message',
+						nodeName: context.getNode().name,
+					});
+				}
+			})();
 		};
 
 		return {
@@ -435,13 +502,19 @@ function createRegistration(
 	if (updateType === 'user_update') {
 		const event = new UserUpdate({});
 		const handler = (...args: unknown[]): void => {
-			const userEvent = args[0] as UserUpdateEvent;
-			const payload = {
-				updateType: 'user_update' as const,
-				userId: userEvent.userId ? String(userEvent.userId) : undefined,
-				status: userEvent.status,
-			};
-			void emit([{ json: payload as unknown as IDataObject }]);
+			void (async () => {
+				const userEvent = args[0] as UserUpdateEvent;
+				try {
+					const payload = await buildUserUpdatePayload(userEvent);
+					await emit([{ json: payload as unknown as IDataObject }]);
+				} catch (error) {
+					logger.error('[TelegramGramProTrigger] Failed to process user update', {
+						error: getErrorMessage(error),
+						updateType: 'user_update',
+						nodeName: context.getNode().name,
+					});
+				}
+			})();
 		};
 
 		return {
@@ -467,10 +540,21 @@ function createAlbumRegistration(
 	client: Awaited<ReturnType<typeof getClient>>,
 	config: ReturnType<typeof parseTriggerConfig>,
 	dedupe: ReturnType<typeof createDedupeTracker>,
+	messageSnapshots: MessageSnapshotStore,
+	emitEvents = true,
 ): RegisteredHandler {
 	const event = new Album({});
 	const handler = (...args: unknown[]): void => {
-		void processAlbumEvent(args[0] as AlbumEvent, emit, context, client, config, dedupe);
+		void processAlbumEvent(
+			args[0] as AlbumEvent,
+			emit,
+			context,
+			client,
+			config,
+			dedupe,
+			messageSnapshots,
+			emitEvents,
+		);
 	};
 
 	return {
@@ -486,6 +570,8 @@ async function processAlbumEvent(
 	client: Awaited<ReturnType<typeof getClient>>,
 	config: ReturnType<typeof parseTriggerConfig>,
 	dedupe: ReturnType<typeof createDedupeTracker>,
+	messageSnapshots: MessageSnapshotStore,
+	emitEvents = true,
 ): Promise<void> {
 	try {
 		const messages = event.messages.filter(
@@ -503,11 +589,18 @@ async function processAlbumEvent(
 		}
 
 		const messageContext = await resolveMessageContext(primaryMessage);
+		const payload = buildAlbumTriggerPayload('message', messages, messageContext);
+		for (const albumMessage of messages) {
+			const albumMessagePayload = buildTriggerPayload('message', albumMessage, messageContext);
+			messageSnapshots.remember(albumMessagePayload);
+		}
+
+		if (!emitEvents) {
+			return;
+		}
 		if (!shouldProcessMessage(primaryMessage, messageContext, config)) {
 			return;
 		}
-
-		const payload = buildAlbumTriggerPayload('message', messages, messageContext);
 		const item = await createAlbumExecutionItem(context, messages, payload, config.disableBinary);
 		await emit([item]);
 	} catch (error) {
@@ -518,6 +611,370 @@ async function processAlbumEvent(
 	}
 }
 
+function createMessageSnapshotStore() {
+	const byId = new Map<string, { payload: TelegramTriggerPayload; timestamp: number }>();
+	const byChatAndId = new Map<string, { payload: TelegramTriggerPayload; timestamp: number }>();
+
+	const cleanup = (): void => {
+		const now = Date.now();
+
+		for (const [key, entry] of byId.entries()) {
+			if (now - entry.timestamp > MESSAGE_SNAPSHOT_TTL_MS) {
+				byId.delete(key);
+			}
+		}
+
+		for (const [key, entry] of byChatAndId.entries()) {
+			if (now - entry.timestamp > MESSAGE_SNAPSHOT_TTL_MS) {
+				byChatAndId.delete(key);
+			}
+		}
+
+		trimMap(byId, MESSAGE_SNAPSHOT_MAX_SIZE);
+		trimMap(byChatAndId, MESSAGE_SNAPSHOT_MAX_SIZE);
+	};
+
+	return {
+		remember(payload: TelegramTriggerPayload): void {
+			const messageId = normalizeMessageId(payload.messageId);
+			if (!messageId) {
+				return;
+			}
+
+			const snapshot = {
+				payload: { ...payload },
+				timestamp: Date.now(),
+			};
+
+			byId.set(messageId, snapshot);
+			const chatId = typeof payload.chatId === 'string' ? payload.chatId : null;
+			if (chatId) {
+				for (const alias of expandNumericIdAliases(chatId)) {
+					byChatAndId.set(`${alias}:${messageId}`, snapshot);
+				}
+			}
+
+			cleanup();
+		},
+
+		get(deletedEvent: DeletedMessageEvent): TelegramTriggerPayload | undefined {
+			cleanup();
+
+			const eventChatId = getDeletedEventChatId(deletedEvent);
+			const deletedIds = Array.isArray(deletedEvent.deletedIds) ? deletedEvent.deletedIds : [];
+
+			for (const deletedId of deletedIds) {
+				const messageId = String(deletedId);
+				if (eventChatId) {
+					for (const alias of expandNumericIdAliases(eventChatId)) {
+						const scoped = byChatAndId.get(`${alias}:${messageId}`);
+						if (scoped) {
+							return scoped.payload;
+						}
+					}
+				}
+
+				const generic = byId.get(messageId);
+				if (generic) {
+					return generic.payload;
+				}
+			}
+
+			return undefined;
+		},
+
+		async waitFor(
+			deletedEvent: DeletedMessageEvent,
+			timeoutMs = 800,
+			intervalMs = 80,
+		): Promise<TelegramTriggerPayload | undefined> {
+			const startedAt = Date.now();
+			while (Date.now() - startedAt <= timeoutMs) {
+				const snapshot = this.get(deletedEvent);
+				if (snapshot) {
+					return snapshot;
+				}
+				await sleep(intervalMs);
+			}
+			return undefined;
+		},
+	};
+}
+
 function getErrorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
+}
+
+function normalizeMessageId(value: unknown): string | null {
+	if (typeof value === 'string' && value.trim()) {
+		return value.trim();
+	}
+
+	if (typeof value === 'number' && Number.isFinite(value)) {
+		return String(value);
+	}
+
+	return null;
+}
+
+function trimMap<T>(map: Map<string, T>, maxSize: number): void {
+	if (map.size <= maxSize) {
+		return;
+	}
+
+	const overflow = map.size - maxSize;
+	const keys = map.keys();
+	for (let i = 0; i < overflow; i += 1) {
+		const next = keys.next();
+		if (next.done) {
+			return;
+		}
+		map.delete(next.value);
+	}
+}
+
+async function buildDeletedMessagePayload(
+	deletedEvent: DeletedMessageEvent,
+	messageSnapshots: MessageSnapshotStore,
+	client: Awaited<ReturnType<typeof getClient>>,
+): Promise<IDataObject> {
+	const deletedIds = Array.isArray(deletedEvent.deletedIds) ? deletedEvent.deletedIds : [];
+	const firstDeletedId = deletedIds[0];
+	const snapshot =
+		messageSnapshots.get(deletedEvent) ?? (await messageSnapshots.waitFor(deletedEvent));
+	const chatInfo = await resolveDeletedEventChatInfo(deletedEvent, snapshot, client);
+	const date = new Date().toISOString();
+	const senderFallbackName =
+		chatInfo.chatType === 'user' || chatInfo.chatType === 'bot' || chatInfo.chatType === 'channel'
+			? chatInfo.chatName
+			: null;
+	const senderFallbackId =
+		chatInfo.chatType === 'user' || chatInfo.chatType === 'bot' ? chatInfo.chatId : null;
+
+	return {
+		updateType: 'deleted_message',
+		date,
+		editDate: null,
+		deletedIds,
+		deletedCount: deletedIds.length,
+		deletedId: firstDeletedId,
+		messageId: firstDeletedId ? String(firstDeletedId) : undefined,
+		groupedId: snapshot?.groupedId,
+		mediaCount: snapshot?.mediaCount,
+		message: snapshot?.message,
+		rawMessage: snapshot?.rawMessage,
+		chatName: chatInfo.chatName ?? senderFallbackName,
+		chatId: chatInfo.chatId,
+		chatType: chatInfo.chatType,
+		senderName: snapshot?.senderName ?? senderFallbackName,
+		senderId: snapshot?.senderId ?? senderFallbackId,
+		senderIsBot: snapshot?.senderIsBot ?? null,
+		isPrivate: chatInfo.isPrivate ?? false,
+		isGroup: chatInfo.isGroup ?? false,
+		isChannel: chatInfo.isChannel,
+		isOutgoing: snapshot?.isOutgoing,
+		messageType: snapshot?.messageType ?? 'other',
+		hasMedia: snapshot?.hasMedia ?? false,
+		fileName: snapshot?.fileName,
+		fileExtension: snapshot?.fileExtension,
+		mimeType: snapshot?.mimeType,
+		size: snapshot?.size,
+		bytes: snapshot?.bytes,
+		mediaFiles: snapshot?.mediaFiles,
+		hasWebPreview: snapshot?.hasWebPreview,
+		mediaDownloadError: snapshot?.mediaDownloadError,
+	};
+}
+
+async function resolveDeletedEventChatInfo(
+	deletedEvent: DeletedMessageEvent,
+	snapshot?: TelegramTriggerPayload,
+	client?: Awaited<ReturnType<typeof getClient>>,
+): Promise<{
+	chatName: string | null;
+	chatId: string | null;
+	chatType: 'user' | 'bot' | 'group' | 'supergroup' | 'channel' | 'unknown';
+	isPrivate: boolean | undefined;
+	isGroup: boolean | undefined;
+	isChannel: boolean;
+}> {
+	const fallbackChatId = getDeletedEventChatId(deletedEvent) ?? snapshot?.chatId ?? null;
+	const fallbackIsPrivate = snapshot?.isPrivate ?? deletedEvent.isPrivate;
+	const fallbackIsGroup = snapshot?.isGroup ?? deletedEvent.isGroup;
+	const fallbackIsChannel = Boolean(snapshot?.isChannel) || deletedEvent.isChannel;
+	const fallbackChatType: 'user' | 'bot' | 'group' | 'supergroup' | 'channel' | 'unknown' =
+		snapshot?.chatType ??
+		(fallbackIsChannel
+			? 'channel'
+			: fallbackIsGroup
+				? 'group'
+				: fallbackIsPrivate
+					? 'user'
+					: 'unknown');
+
+	try {
+		const chat = await deletedEvent.getChat();
+		if (!chat) {
+			return {
+				chatName: snapshot?.chatName ?? null,
+				chatId: fallbackChatId,
+				chatType: fallbackChatType,
+				isPrivate: fallbackIsPrivate,
+				isGroup: fallbackIsGroup,
+				isChannel: fallbackIsChannel,
+			};
+		}
+
+		if (chat instanceof Api.User) {
+			const name = [chat.firstName, chat.lastName].filter(Boolean).join(' ').trim();
+			return {
+				chatName: name || chat.username || null,
+				chatId: fallbackChatId ?? String(chat.id),
+				chatType: chat.bot ? 'bot' : 'user',
+				isPrivate: true,
+				isGroup: false,
+				isChannel: false,
+			};
+		}
+
+		if (chat instanceof Api.Chat || chat instanceof Api.ChatEmpty) {
+			const title = chat instanceof Api.Chat ? chat.title : null;
+			return {
+				chatName: title ?? null,
+				chatId: fallbackChatId,
+				chatType: 'group',
+				isPrivate: false,
+				isGroup: true,
+				isChannel: false,
+			};
+		}
+
+		if (chat instanceof Api.Channel || chat instanceof Api.ChannelForbidden) {
+			const isBroadcast = chat instanceof Api.Channel ? Boolean(chat.broadcast) : true;
+			const title = chat.title ?? null;
+			return {
+				chatName: title,
+				chatId: fallbackChatId,
+				chatType: isBroadcast ? 'channel' : 'supergroup',
+				isPrivate: false,
+				isGroup: !isBroadcast,
+				isChannel: true,
+			};
+		}
+	} catch {
+		// Fall back to metadata exposed by DeletedMessageEvent when chat cannot be resolved.
+	}
+
+	// Try one more direct entity resolution path when event entities are not present.
+	if (client && fallbackChatId) {
+		try {
+			const entity = (await client.getEntity(fallbackChatId as never)) as unknown;
+			if (entity instanceof Api.User) {
+				const name = [entity.firstName, entity.lastName].filter(Boolean).join(' ').trim();
+				return {
+					chatName: name || entity.username || null,
+					chatId: fallbackChatId ?? String(entity.id),
+					chatType: entity.bot ? 'bot' : 'user',
+					isPrivate: true,
+					isGroup: false,
+					isChannel: false,
+				};
+			}
+			if (entity instanceof Api.Chat || entity instanceof Api.ChatForbidden) {
+				return {
+					chatName: entity.title ?? null,
+					chatId: fallbackChatId,
+					chatType: 'group',
+					isPrivate: false,
+					isGroup: true,
+					isChannel: false,
+				};
+			}
+			if (entity instanceof Api.Channel || entity instanceof Api.ChannelForbidden) {
+				const isBroadcast = entity instanceof Api.Channel ? Boolean(entity.broadcast) : true;
+				return {
+					chatName: entity.title ?? null,
+					chatId: fallbackChatId,
+					chatType: isBroadcast ? 'channel' : 'supergroup',
+					isPrivate: false,
+					isGroup: !isBroadcast,
+					isChannel: true,
+				};
+			}
+		} catch {
+			// Ignore fallback resolution failures.
+		}
+	}
+
+	return {
+		chatName: snapshot?.chatName ?? null,
+		chatId: fallbackChatId,
+		chatType: fallbackChatType,
+		isPrivate: fallbackIsPrivate,
+		isGroup: fallbackIsGroup,
+		isChannel: fallbackIsChannel,
+	};
+}
+
+async function sleep(ms: number): Promise<void> {
+	await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getDeletedEventChatId(deletedEvent: DeletedMessageEvent): string | null {
+	const originalUpdate = deletedEvent.originalUpdate;
+	if (originalUpdate instanceof Api.UpdateDeleteChannelMessages) {
+		return normalizeDeletedChannelId(originalUpdate.channelId);
+	}
+	const chatId = deletedEvent.chatId;
+	if (chatId === undefined || chatId === null) {
+		return null;
+	}
+	return chatId.toString();
+}
+
+function normalizeDeletedChannelId(value: unknown): string | null {
+	if (typeof value === 'number' || typeof value === 'bigint') {
+		const id = String(value);
+		if (id.startsWith('-100')) return id;
+		if (id.startsWith('-')) return id;
+		return `-100${id}`;
+	}
+	if (typeof value === 'string') {
+		const id = value.trim();
+		if (!id) return null;
+		if (id.startsWith('-100')) return id;
+		if (id.startsWith('-')) return id;
+		if (/^\d+$/.test(id)) return `-100${id}`;
+		return id;
+	}
+	if (typeof value === 'object' && value !== null && 'toString' in value) {
+		return normalizeDeletedChannelId(value.toString());
+	}
+	return null;
+}
+
+function expandNumericIdAliases(value: string): string[] {
+	const trimmed = value.trim();
+	if (!trimmed) {
+		return [];
+	}
+	const aliases = new Set<string>([trimmed]);
+	if (!/^-?\d+$/.test(trimmed)) {
+		return Array.from(aliases);
+	}
+	if (trimmed.startsWith('-100') && trimmed.length > 4) {
+		const bare = trimmed.slice(4);
+		aliases.add(bare);
+		aliases.add(`-${bare}`);
+		return Array.from(aliases);
+	}
+	if (trimmed.startsWith('-')) {
+		const bare = trimmed.slice(1);
+		aliases.add(bare);
+		aliases.add(`-100${bare}`);
+		return Array.from(aliases);
+	}
+	aliases.add(`-${trimmed}`);
+	aliases.add(`-100${trimmed}`);
+	return Array.from(aliases);
 }
