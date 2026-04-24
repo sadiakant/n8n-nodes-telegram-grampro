@@ -1,4 +1,13 @@
 
+## GramPro v6.0.1 [Date: 25-APR-2026] 🚀
+
+Patch release for `Copy Message` stability and caption formatting.
+
+### Patches & Bug Fixes 🐛
+- **Fixed Copy Message Caption Parsing**: Custom captions in `Copy Message` now parse Markdown/HTML correctly, so `{{ $json.text }}` keeps Telegram links and formatting rendered instead of showing raw markup.
+
+---
+
 ## GramPro v6.0.0 [Date: 17-APR-2026] 🚀
 
 This is a major milestone release that migrates the entire engine to **Teleproto** for unprecedented stability and introduces powerful new monitoring capabilities! ✨

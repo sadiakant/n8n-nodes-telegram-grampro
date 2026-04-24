@@ -1840,6 +1840,7 @@ async function copyMessage(
 	const messageId = Number(this.getNodeParameter('messageId', i));
 	const caption = this.getNodeParameter('caption', i, '') as string;
 	const disableLinkPreview = this.getNodeParameter('disableLinkPreview', i, false) as boolean;
+	const formattedCaptionInput = prepareTelegramTextInput(caption);
 
 	logger.info(
 		`Copy Message start: source=${String(sourceChatId)} messageId=${messageId} target=${String(targetChatId)}`,
@@ -1855,8 +1856,10 @@ async function copyMessage(
 	const originalMessage = messages[0] as TelegramMessageView | undefined;
 	if (!originalMessage) throw new Error('Original message not found');
 
-	let messageContent = getMessageText(originalMessage);
-	if (caption && caption.trim()) messageContent = caption;
+	const hasCustomCaption = !!caption && caption.trim() !== '';
+	const messageContent = hasCustomCaption
+		? formattedCaptionInput.text || caption
+		: getMessageText(originalMessage);
 
 	// --- FIX START ---
 	// Check if media exists and if it is a WebPage (Link Preview).
@@ -1877,7 +1880,8 @@ async function copyMessage(
 				message: messageContent,
 				file: mediaToSend, // Use the filtered variable here
 				linkPreview: !disableLinkPreview,
-				formattingEntities: originalMessage.entities || [],
+				parseMode: hasCustomCaption ? formattedCaptionInput.parseMode : undefined,
+				formattingEntities: hasCustomCaption ? undefined : originalMessage.entities || [],
 			}),
 		),
 	);
