@@ -8,6 +8,7 @@ import { CustomFile } from 'teleproto/client/uploads';
 
 import { logger } from '../core/logger';
 import { prepareTelegramTextInput, renderTelegramEntities } from '../core/messageFormatting';
+import { asNodeOperationError, createNodeOperationError } from '../core/nodeOperationError';
 import type { TelegramClientInstance, TelegramCredentials, TelegramEntity } from '../core/types';
 import {
 	buildSharedAlbumPayload,
@@ -1049,15 +1050,16 @@ async function deleteHistory(
 					];
 				}
 
-				throw messagesError;
+				throw asNodeOperationError(messagesError, { context: this, itemIndex: i });
 			}
 
 			offset = response.offset;
 			loopCount++;
 
 			if (loopCount > 100) {
-				throw new Error(
+				throw createNodeOperationError(
 					`Delete history safety cap exceeded after ${loopCount} iterations (offset=${offset}). Aborting to prevent an infinite loop.`,
+					{ context: this, itemIndex: i },
 				);
 			}
 			if (offset > 0) await new Promise((resolve) => setTimeout(resolve, 100));
@@ -2094,13 +2096,13 @@ async function copyRestrictedContent(
 			(error as Error).message.includes('RESTRICTED') ||
 			(error as Error).message.includes('SAVING_CONTENT_RESTRICTED')
 		) {
-			throw new Error(
+			throw createNodeOperationError(
 				`Content is restricted and cannot be copied. Error: ${(error as Error).message}`,
-				{ cause: error },
+				{ context: this, itemIndex: i, cause: error },
 			);
 		}
 
-		throw error;
+		throw asNodeOperationError(error, { context: this, itemIndex: i });
 	}
 }
 
@@ -2173,9 +2175,7 @@ async function downloadMediaBuffer(
 		// Fallback: try to convert result to buffer
 		return Buffer.from(String(result));
 	} catch (error) {
-		throw new Error(`Failed to download media: ${error}`, {
-			cause: error,
-		});
+		throw createNodeOperationError(`Failed to download media: ${error}`, { cause: error });
 	}
 }
 
@@ -2254,7 +2254,7 @@ async function handlePhoto(
 		}
 
 		// If it's not a restriction error, re-throw it
-		throw forwardError;
+		throw asNodeOperationError(forwardError);
 	}
 }
 

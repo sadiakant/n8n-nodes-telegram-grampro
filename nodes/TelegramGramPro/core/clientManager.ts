@@ -2,6 +2,7 @@ import { TelegramClient } from 'teleproto';
 import { StringSession } from 'teleproto/sessions';
 import { LogLevel } from 'teleproto/extensions/Logger';
 import { logger } from './logger';
+import { asNodeOperationError, createNodeOperationError } from './nodeOperationError';
 import { SessionEncryption } from './sessionEncryption';
 import * as crypto from 'crypto';
 
@@ -22,10 +23,12 @@ const connectionLocks = new Map<string, Promise<TelegramClient>>();
 const connectionTimestamps = new Map<string, number>();
 // Track last usage time for idle cleanup
 const clientLastUsed = new Map<string, number>();
-// Cleanup interval (1 minute — frequent checks for responsive cleanup)
+// Cleanup interval (1 minute - frequent checks for responsive cleanup)
 const CLEANUP_INTERVAL = 1 * 60 * 1000;
 const MAX_CONNECTION_AGE = 30 * 60 * 1000; // 30 minutes
-const MAX_IDLE_AGE = 5 * 60 * 1000; // 5 minutes idle → auto-disconnect (only for clients without event handlers)
+// Keep operation-only clients short-lived so wait nodes do not leave a live
+// MTProto update stream running in the background for minutes at a time.
+const MAX_IDLE_AGE = 30 * 1000; // 30 seconds idle -> auto-disconnect (only for clients without event handlers)
 
 // Automatic cleanup of stale connections
 setInterval(() => {
@@ -71,6 +74,37 @@ function buildClientKey(apiId: number, session: string): string {
 
 function isDestroyedClient(client: TelegramClient): boolean {
 	return Boolean((client as TelegramClient & { _destroyed?: boolean })._destroyed);
+}
+
+async function verifyClientAuthorization(
+	client: TelegramClient,
+	receiveUpdates: boolean,
+): Promise<void> {
+	if (receiveUpdates) {
+		// getMe primes Telegram's update delivery for trigger-style clients.
+		await client.getMe();
+		return;
+	}
+
+	const authorized = await client.checkAuthorization();
+	if (!authorized) {
+		throw createNodeOperationError('Telegram client is not authorized.');
+	}
+}
+
+async function prepareConnectedClient(
+	client: TelegramClient,
+	options: { receiveUpdates: boolean; verifyAuthorization: boolean },
+): Promise<void> {
+	if (options.receiveUpdates) {
+		// Operation-only workflows do not need missed-update recovery, and this
+		// path is the one currently surfacing constructor-ID parser crashes.
+		await client.catchUp?.();
+	}
+
+	if (options.verifyAuthorization) {
+		await verifyClientAuthorization(client, options.receiveUpdates);
+	}
 }
 
 export async function getClient(
@@ -121,8 +155,12 @@ export async function getClient(
 				clientLastUsed.delete(key);
 				// Fall through to create a new client below
 			} else if (existingClient.connected) {
-				// Client is healthy and active — reuse it
+				// Client is healthy and active - reuse it
 				clientLastUsed.set(key, Date.now());
+				await prepareConnectedClient(existingClient, {
+					receiveUpdates,
+					verifyAuthorization,
+				});
 				logger.debug(
 					`[ClientManager] [${purpose}] Reusing existing connected client for ${numericApiId}`,
 				);
@@ -134,8 +172,10 @@ export async function getClient(
 				);
 				try {
 					await existingClient.connect();
-					// Recover any updates missed during disconnect
-					await existingClient.catchUp?.();
+					await prepareConnectedClient(existingClient, {
+						receiveUpdates,
+						verifyAuthorization,
+					});
 					clientLastUsed.set(key, Date.now());
 					return existingClient;
 				} catch {
@@ -177,7 +217,7 @@ export async function getClient(
 					`[ClientManager] [${purpose}] Session decryption failed for ${numericApiId}: ${error}`,
 				);
 				const message = error instanceof Error ? error.message : String(error);
-				throw new Error(`Session decryption failed: ${message}`, { cause: error });
+				throw createNodeOperationError(`Session decryption failed: ${message}`, { cause: error });
 			}
 		}
 
@@ -190,13 +230,10 @@ export async function getClient(
 
 		try {
 			await client.connect();
-			// Recover any updates missed during disconnect (teleproto feature)
-			await client.catchUp?.();
-
-			// Verify authorization only when we intend to keep using this client.
-			if (verifyAuthorization) {
-				await client.getMe();
-			}
+			await prepareConnectedClient(client, {
+				receiveUpdates,
+				verifyAuthorization,
+			});
 
 			logger.info(`[ClientManager] [${purpose}] Connection established for ${numericApiId}`);
 			if (cacheClient) {
@@ -207,7 +244,7 @@ export async function getClient(
 		} catch (error) {
 			logger.error(`[ClientManager] [${purpose}] Connection failed for ${numericApiId}: ${error}`);
 			await gracefulDestroy(client);
-			throw error;
+			throw asNodeOperationError(error);
 		} finally {
 			// Remove the lock and timestamp so future requests can try again if this failed
 			connectionLocks.delete(key);

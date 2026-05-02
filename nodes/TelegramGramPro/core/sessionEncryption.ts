@@ -1,5 +1,6 @@
 import * as crypto from 'crypto';
 import { StringSession } from 'teleproto/sessions';
+import { createNodeOperationError } from './nodeOperationError';
 
 /**
  * Session encryption utility for secure storage of Telegram sessions
@@ -51,7 +52,7 @@ export class SessionEncryption {
 			return `n8n:${combined.toString('base64')}`;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			throw new Error(`Session encryption failed: ${message}`, { cause: error });
+			throw createNodeOperationError(`Session encryption failed: ${message}`, { cause: error });
 		}
 	}
 
@@ -84,7 +85,7 @@ export class SessionEncryption {
 			return decryptedBuffer.toString('utf8');
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			throw new Error(`Session decryption failed: ${message}`, { cause: error });
+			throw createNodeOperationError(`Session decryption failed: ${message}`, { cause: error });
 		}
 	}
 

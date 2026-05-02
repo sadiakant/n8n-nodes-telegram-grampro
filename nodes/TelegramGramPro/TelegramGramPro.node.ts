@@ -27,6 +27,7 @@ export class TelegramGramPro implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Telegram GramPro',
 		name: 'telegramGramPro',
+		subtitle: '={{$parameter["resource"] + ": " + $parameter["operation"]}}',
 		icon: 'file:telegram-grampro.svg',
 		group: ['transform'],
 		version: 1,

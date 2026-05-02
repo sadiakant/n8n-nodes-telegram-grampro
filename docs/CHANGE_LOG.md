@@ -1,4 +1,18 @@
 
+## GramPro v6.0.2 [Date: 02-MAY-2026] 🚀
+
+Patch release for safer operation-client handling in wait-heavy Telegram workflows.
+
+### Patches & Bug Fixes 🐛
+- **Hardened Operation Client Lifecycle**: Non-trigger operations no longer run Telegram update catch-up unless `receiveUpdates` is actually needed.
+- **Safer Operation Authorization Check**: Operation-only connections now use `checkAuthorization()` instead of `getMe()`, avoiding unnecessary update initialization for simple actions like history, copy, send, and edit.
+- **Faster Idle Client Cleanup**: Clients without event handlers now disconnect much sooner when idle, reducing the chance of background MTProto update recovery during long `Wait` steps.
+- **Reduced Teleproto Gap-Recovery Crashes**: These changes were added to reduce constructor/TLObject parse failures seen during channel-gap recovery in active channel automations.
+- **Fixed Community Lint Errors**: Replaced raw `Error` throws and rethrows in shared helpers and Telegram operations with proper n8n `NodeOperationError` handling, so the package now passes `n8n-node lint` cleanly.
+- **Completed Node Metadata**: Added the missing node `subtitle` required by the community-node lint rules for `Telegram GramPro`.
+
+---
+
 ## GramPro v6.0.1 [Date: 25-APR-2026] 🚀
 
 Patch release for `Copy Message` stability and caption formatting.

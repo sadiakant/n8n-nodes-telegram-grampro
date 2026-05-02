@@ -1,4 +1,10 @@
-import { IExecuteFunctions, INodeExecutionData, IDataObject, GenericValue } from 'n8n-workflow';
+import {
+	IExecuteFunctions,
+	INodeExecutionData,
+	IDataObject,
+	GenericValue,
+	NodeOperationError,
+} from 'n8n-workflow';
 import { TelegramClient, Api } from 'teleproto';
 import { StringSession } from 'teleproto/sessions';
 import { logger } from '../core/logger';
@@ -6,6 +12,7 @@ import { safeExecute } from '../core/floodWaitHandler';
 import { mapTelegramError } from '../core/telegramErrorMapper';
 import { LogLevel } from 'teleproto/extensions/Logger';
 import { generateQrPngBuffer, getQrPngFileName } from '../core/qrPng';
+import { asNodeOperationError, createNodeOperationError } from '../core/nodeOperationError';
 
 type SentCodeDetails = {
 	phoneCodeHash: string;
@@ -221,7 +228,9 @@ export async function authenticationRouter(
 	if (operation === 'requestQr') return requestQrLogin.call(this, i);
 	if (operation === 'completeQr') return completeQrLogin.call(this, i);
 	if (operation === 'signIn') return signIn.call(this, i);
-	throw new Error(`Auth operation ${operation} not supported.`);
+	throw new NodeOperationError(this.getNode(), `Auth operation ${operation} not supported.`, {
+		itemIndex: i,
+	});
 }
 
 function extractSentCodeDetails(sentCode: Api.auth.SentCode): SentCodeDetails {
@@ -304,7 +313,7 @@ async function requestCode(this: IExecuteFunctions, i: number): Promise<INodeExe
 		}
 	} catch (error) {
 		logger.error(`RequestCode failed: ${error}`);
-		throw error;
+		throw asNodeOperationError(error, { context: this, itemIndex: i });
 	} finally {
 		// Ensure cleanup happens BEFORE returning data to n8n
 		await forceCleanup(client, phoneNumber);
@@ -395,7 +404,7 @@ async function resendCode(this: IExecuteFunctions, i: number): Promise<INodeExec
 		}
 	} catch (error) {
 		logger.error(`ResendCode failed: ${error}`);
-		throw error;
+		throw asNodeOperationError(error, { context: this, itemIndex: i });
 	} finally {
 		await forceCleanup(client, phoneNumber);
 	}
@@ -546,7 +555,7 @@ async function requestQrLogin(this: IExecuteFunctions, i: number): Promise<INode
 		};
 	} catch (error) {
 		logger.error(`RequestQrLogin failed: ${error}`);
-		throw error;
+		throw asNodeOperationError(error, { context: this, itemIndex: i });
 	} finally {
 		await forceCleanup(client, 'qr-login');
 	}
@@ -694,9 +703,9 @@ async function completeQrLogin(this: IExecuteFunctions, i: number): Promise<INod
 		const mappedError = mapTelegramError(error);
 		if (mappedError.code === 'SESSION_PASSWORD_NEEDED') {
 			if (!password2fa) {
-				throw new Error(
+				throw createNodeOperationError(
 					'Two-step verification is enabled. Provide your 2FA password in the Complete QR Login operation.',
-					{ cause: error },
+					{ context: this, itemIndex: i, cause: error },
 				);
 			}
 
@@ -707,7 +716,7 @@ async function completeQrLogin(this: IExecuteFunctions, i: number): Promise<INod
 						{
 							password: async () => password2fa,
 							onError: async (e) => {
-								throw e;
+								throw asNodeOperationError(e, { context: this, itemIndex: i });
 							},
 						},
 					),
@@ -730,7 +739,7 @@ async function completeQrLogin(this: IExecuteFunctions, i: number): Promise<INod
 		}
 
 		logger.error(`CompleteQrLogin failed: ${error}`);
-		throw error;
+		throw asNodeOperationError(error, { context: this, itemIndex: i });
 	} finally {
 		await forceCleanup(client, 'qr-login');
 	}
@@ -764,13 +773,13 @@ async function signIn(this: IExecuteFunctions, i: number): Promise<INodeExecutio
 			const mappedError = mapTelegramError(err);
 			const is2faError = mappedError.code === 'SESSION_PASSWORD_NEEDED';
 
-			if (!is2faError) throw err;
+			if (!is2faError) throw asNodeOperationError(err, { context: this, itemIndex: i });
 
 			// Fallback to 2FA password-based login using built-in helper
 			if (!password2fa) {
-				throw new Error(
+				throw createNodeOperationError(
 					'Two-step verification is enabled on this account. Please provide the 2FA password.',
-					{ cause: err },
+					{ context: this, itemIndex: i, cause: err },
 				);
 			}
 
@@ -781,7 +790,7 @@ async function signIn(this: IExecuteFunctions, i: number): Promise<INodeExecutio
 						{
 							password: async () => password2fa,
 							onError: async (e) => {
-								throw e;
+								throw asNodeOperationError(e, { context: this, itemIndex: i });
 							},
 						},
 					),
@@ -791,7 +800,7 @@ async function signIn(this: IExecuteFunctions, i: number): Promise<INodeExecutio
 		sessionString = saveSessionString(client, 'signIn');
 	} catch (error) {
 		logger.error(`SignIn failed: ${error}`);
-		throw error;
+		throw asNodeOperationError(error, { context: this, itemIndex: i });
 	} finally {
 		await forceCleanup(client, phoneNumber);
 	}
