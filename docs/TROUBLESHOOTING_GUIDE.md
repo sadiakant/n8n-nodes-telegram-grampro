@@ -599,7 +599,7 @@ Check these points:
 ### **New Operation Issues**
 
 #### **"User Operation failed" Error**
-**Problem**: User-related operations (profile updates, username changes) fail.
+**Problem**: User-related operations (profile updates, username changes, status updates) fail.
 
 **Causes:**
 - Invalid user ID format
@@ -607,6 +607,7 @@ Check these points:
 - Username already taken
 - Account restrictions
 - Privacy settings conflicts
+- Telegram presence/privacy settings affecting status visibility
 
 **Solutions:**
 1. **Verify User ID**
@@ -628,6 +629,57 @@ Check these points:
    - Respect user privacy settings
    - Check for privacy restrictions
    - Use appropriate permissions
+
+5. **Status Updates**
+   - For `Update My Status`, verify whether Telegram privacy settings allow others to see your online state
+   - Test both `offline: true` and `offline: false` with a simple workflow
+
+---
+
+#### **"Read Messages History failed" Error**
+**Problem**: Messages are not marked as read/seen.
+
+**Causes:**
+- Invalid chat ID or message ID
+- The message ID does not exist in that chat
+- The account cannot access the chat history
+- Telegram requires channel-specific handling for channels or supergroups
+
+**Solutions:**
+1. **Verify Inputs**
+   - Confirm the chat ID, username, or invite link resolves correctly
+   - Use a message ID returned by `Get Chat History` from the same chat
+
+2. **Check Access**
+   - Ensure the account is a member of the chat, group, supergroup, or channel
+   - Confirm the account can see the target message in Telegram
+
+3. **Use the Correct Message ID**
+   - The operation marks messages as read up to the selected message ID
+   - Avoid passing IDs from a different source chat
+
+---
+
+#### **"Send Chat Action failed" Error**
+**Problem**: Typing/uploading/recording action is not shown or the operation fails.
+
+**Causes:**
+- Invalid or unresolved chat reference
+- The account cannot send actions in the target chat
+- The action is temporary and expired before it was visible
+
+**Solutions:**
+1. **Verify Chat Resolution**
+   - Use a username, invite link, full numeric ID, or a chat already present in the account dialog list
+   - For channels/groups, prefer the full `-100...` ID when using numeric values
+
+2. **Check Permissions**
+   - Confirm the account can write or interact in the target chat
+   - Test with `Typing` before trying upload or game actions
+
+3. **Timing**
+   - Send the chat action immediately before the real message/media step
+   - Use `Cancel Action` if a workflow branch stops before sending the follow-up message
 
 ---
 

@@ -1930,7 +1930,10 @@ async function copyMessage(
  * Robust peer resolver to avoid "Could not find the input entity" errors when the client
  * has not cached a user/channel yet. We try getInputEntity first, then search dialogs.
  */
-export async function resolvePeer(client: TelegramClientInstance, rawId: unknown): Promise<unknown> {
+export async function resolvePeer(
+	client: TelegramClientInstance,
+	rawId: unknown,
+): Promise<unknown> {
 	if (isResolvablePeerObject(rawId)) {
 		return rawId;
 	}

@@ -472,6 +472,34 @@ Clear message history from a chat with specialized options for deleting for ever
 
 ---
 
+#### **Read Messages History** 👁️
+Mark messages as read/seen in a chat up to a selected message ID.
+
+**Parameters:**
+- **Chat ID**: Target chat ID, username (@channel), or invite link
+- **Message ID**: Highest message ID to mark as read
+
+**Example:**
+```json
+{
+  "operation": "readHistory",
+  "chatId": "@channel_name",
+  "messageId": 456
+}
+```
+
+**Use Cases:**
+- Marking automation inbox messages as seen after processing
+- Keeping source chats clean after copy/forward workflows
+- Acknowledging channel or supergroup history after a scheduled read
+
+**Behavior Notes:**
+- Channels and supergroups use Telegram's channel read-history method.
+- Private chats and normal groups use Telegram's standard message read-history method.
+- The operation marks history as read up to the provided message ID.
+
+---
+
 ### 💬 Chat Operations
 
 #### **Get Chat Info**
@@ -550,6 +578,50 @@ Join a chat using invite link with enhanced validation.
 - **Invite Link Validation**: Verify invite link validity
 - **Permission Checking**: Check join permissions
 - **Error Handling**: Clear error messages for restrictions
+
+---
+
+#### **Send Chat Action**
+Send live activity indicators to a chat, such as typing, recording, or uploading.
+
+**Parameters:**
+- **Chat ID**: Target chat ID, username (@channel), or invite link
+- **Action Type**: Activity indicator to send
+
+**Supported Action Types:**
+- Typing
+- Recording Video
+- Uploading Document
+- Uploading Photo
+- Uploading Video
+- Uploading Video Note
+- Uploading Voice Note
+- Choosing Contact
+- Choosing Location
+- Choosing Sticker
+- Recording Video Note
+- Recording Voice Note
+- Starting Game
+- Watching Animations
+- Cancel Action
+
+**Example:**
+```json
+{
+  "operation": "chatAction",
+  "chatId": "@target_chat",
+  "actionType": "chatActionTyping"
+}
+```
+
+**Use Cases:**
+- Showing typing before sending generated replies
+- Simulating upload activity before media delivery
+- Cancelling a previous chat action when a workflow branch stops
+
+**Behavior Notes:**
+- Chat actions are temporary Telegram indicators.
+- The operation uses the same robust peer resolution as message operations, so usernames, invite links, numeric IDs, and known dialog entities are supported.
 
 ---
 
@@ -665,6 +737,31 @@ Change your Telegram username with enhanced validation and availability checking
 - **Availability Checking**: Check username availability
 - **Format Validation**: Validate username format requirements
 - **Error Handling**: Clear error messages for conflicts
+
+---
+
+#### **Update My Status**
+Switch your Telegram account presence between online and offline.
+
+**Parameters:**
+- **Offline**: Enable to appear offline, disable to appear online
+
+**Example:**
+```json
+{
+  "operation": "updateStatus",
+  "offline": false
+}
+```
+
+**Use Cases:**
+- Showing the account online while a workflow is actively responding
+- Returning the account to offline after scheduled automation
+- Presence management for user-account automation
+
+**Behavior Notes:**
+- Telegram privacy settings and client behavior may affect how other users see your presence.
+- The operation returns the requested `offline` state and a success or failure message.
 
 ---
 
@@ -1066,9 +1163,9 @@ Complete the authentication process and generate a session string with enhanced 
 | Resource | Operations | Description |
 |----------|------------|-------------|
 | **Auth** | B1-B3 Phone Login, A1-A2 QR Login | Account authentication and setup with enhanced security |
-| **Message** | Send Message, Get Chat History, Edit, Delete, Pin, Forward, Copy, Edit Media, Unpin, Create Poll, Copy Restricted Content, Clear History | Complete message management with advanced features |
-| **Chat** | Get Chat Info, Get Chats List, Join Channel/Group, Leave Channel/Group, Create Group/Channel | Chat and group operations with enhanced validation |
-| **User** | Get My Profile, Get Profiles Photo, Update My Profile, Update My Username, Get User Profile | User information and management with privacy respect |
+| **Message** | Send Message, Get Chat History, Read Messages History, Edit, Delete, Pin, Forward, Copy, Edit Media, Unpin, Create Poll, Copy Restricted Content, Clear History | Complete message management with advanced features |
+| **Chat** | Get Chat Info, Get Chats List, Join Channel/Group, Leave Channel/Group, Create Group/Channel, Send Chat Action | Chat and group operations with enhanced validation |
+| **User** | Get My Profile, Get Profiles Photo, Update My Profile, Update My Username, Update My Status, Get User Profile | User information and management with privacy respect |
 | **Media** | Download Media Files | Media file handling with progress tracking |
 | **Channel** | Add Member, Remove Member, Ban User, Unban User, Promote to Admin, Get Members | Channel and group administration with granular permissions |
 
@@ -1107,6 +1204,7 @@ Ready-to-import examples are available in [`docs/Workflows-Examples`](./Workflow
 ### **Message Operations**
 - Use appropriate chat IDs (numeric, username, or invite links)
 - Handle message IDs carefully for edit/delete operations
+- Use `Read Messages History` only after you have confirmed the target message ID exists in that chat
 - Consider notification settings for pinned messages
 - Use anonymous voting for sensitive polls
 - Leverage new media features for enhanced content handling
@@ -1114,6 +1212,7 @@ Ready-to-import examples are available in [`docs/Workflows-Examples`](./Workflow
 ### **Chat Operations**
 - Verify chat permissions before operations
 - Use proper invite links for joining chats
+- Use chat actions as short-lived indicators before the follow-up send/edit operation
 - Handle chat creation errors gracefully
 - Monitor chat limits and restrictions
 - Use enhanced filtering for better results
@@ -1122,6 +1221,7 @@ Ready-to-import examples are available in [`docs/Workflows-Examples`](./Workflow
 - Respect user privacy settings
 - Handle user not found errors
 - Use proper user identification methods
+- Be mindful that presence updates can still be limited by Telegram privacy settings
 - Monitor user activity appropriately
 - Use enhanced validation for profile updates
 

@@ -592,8 +592,6 @@ async function createChannel(
 	];
 }
 
-
-
 async function chatAction(
 	this: IExecuteFunctions,
 	client: TelegramClientInstance,
@@ -640,7 +638,6 @@ async function chatAction(
 				return new Api.SendMessageTypingAction();
 		}
 	}
-
 
 	await safeExecute(() =>
 		client.invoke(

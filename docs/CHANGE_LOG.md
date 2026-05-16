@@ -1,3 +1,19 @@
+## GramPro v6.0.3 [Date: 16-MAY-2026] 🚀
+
+Patch release adding new Telegram account automation actions from the merged community PRs.
+
+### What's New? 🌟
+- **New Message Operation: Read Messages History**: Added a `Read Messages History` operation to mark messages as read/seen up to a selected message ID in a specific chat, group, supergroup, or channel.
+- **Channel-Aware Read/Seen Logic**: Read history now automatically uses Telegram's channel read-history API for channels and supergroups, and the standard message read-history API for private chats and normal groups.
+- **New User Operation: Update My Status**: Added `Update My Status` so workflows can switch the Telegram account presence between online and offline.
+- **New Chat Operation: Send Chat Action**: Added `Send Chat Action` for sending real-time activity indicators such as typing, recording video, uploading photo/video/document, uploading voice/video notes, choosing contact/location/sticker, starting game, watching animations, and cancel action.
+
+### Improvements 🛠️
+- **Reusable Peer Resolution for Chat Actions**: The existing robust Telegram peer resolver is now exported and reused by chat actions, helping the new operation work with usernames, invite links, numeric IDs, and cached dialog entities.
+- **Expanded Node UI Parameters**: Added the required node parameters for `Read Messages History`, `Update My Status`, and `Send Chat Action`, including shared chat/message fields and a dedicated action-type selector.
+- **Structured Operation Results**: New operations return clear success payloads with the selected chat/message/action/status values, making them easier to use in downstream workflow steps.
+
+---
 
 ## GramPro v6.0.2 [Date: 02-MAY-2026] 🚀
 

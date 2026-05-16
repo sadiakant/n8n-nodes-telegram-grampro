@@ -30,9 +30,9 @@ Telegram GramPro is a comprehensive n8n custom node that brings the full power o
 
 #### **Core Operations**
 
-- **Messages**: Send, get messages (time-based filters), edit, delete, pin, forward, copy, create polls and quizzes
-- **Chats**: Get chats, dialogs, join/leave, create groups/channels
-- **Users**: Get user info, full details with bio and common chats, update profile, change username, get profile photos
+- **Messages**: Send, get messages (time-based filters), mark history as read/seen, edit, delete, pin, forward, copy, create polls and quizzes
+- **Chats**: Get chats, dialogs, join/leave, create groups/channels, send live chat actions like typing or uploading
+- **Users**: Get user info, full details with bio and common chats, update profile, change username, update online/offline status, get profile photos
 - **Media**: Download media files with progress tracking
 - **Channels**: Get participants, manage members, ban/promote users
 
@@ -50,6 +50,9 @@ Telegram GramPro is a comprehensive n8n custom node that brings the full power o
 - **User Update Trigger** - Monitor real-time online/offline status and bio changes 👤
 - **Teleproto Engine** - Migrated to a more stable core to handle massive supergroups 📡
 - **Topic Support** - `Get History` now supports direct Thread/Topic URLs 🔗
+- **Read/Seen Messages** - Mark private, group, supergroup, and channel history as read up to a selected message ID
+- **Chat Actions** - Send typing, recording, uploading, choosing sticker/location/contact, game, animation seen, or cancel indicators
+- **Presence Control** - Switch your Telegram account status between online and offline from a workflow
 - **Copy Restricted Content** - Handle media that cannot be forwarded normally
 - **Edit Message Media** - Update media content in existing messages with caption support
 - **Enhanced Authentication** - Improved session management with better error handling
@@ -130,9 +133,9 @@ For detailed documentation of all operations with parameters, examples, and use 
 | Resource              | Operations                                                                                                  |
 | --------------------- | ----------------------------------------------------------------------------------------------------------- |
 | **Auth**              | Request Login Code, Resend Login Code, Sign in, Request QR Login, Complete QR Login                         |
-| **Message**           | Send Message, Get Chat History, Edit, Delete, Pin, Forward, Copy, Edit Media, Create Poll, Copy Restricted Content, Clear History, Unpin Message |
-| **Chat**              | Get Chat Info, Get Chats List, Join Channel/Group, Leave Channel/Group, Create Group/Channel                |
-| **User**              | Get My Profile, Get Profiles Photo, Update My Profile, Update My Username, Get User Profile (Bio & Common Chats) |
+| **Message**           | Send Message, Get Chat History, Read Messages History, Edit, Delete, Pin, Forward, Copy, Edit Media, Create Poll, Copy Restricted Content, Clear History, Unpin Message |
+| **Chat**              | Get Chat Info, Get Chats List, Join Channel/Group, Leave Channel/Group, Create Group/Channel, Send Chat Action |
+| **User**              | Get My Profile, Get Profiles Photo, Update My Profile, Update My Username, Update My Status, Get User Profile (Bio & Common Chats) |
 | **Media**             | Download Media Files                                                                                        |
 | **Channel**           | Add Member, Remove Member, Ban User, Unban User, Promote to Admin, Get Members                              |
 
