@@ -23,6 +23,84 @@ const messageTypeOptions = [
 	{ name: 'Other', value: 'other' },
 ];
 
+const chatActionTypes = [
+	{
+		name: 'Typing',
+		value: 'chatActionTyping',
+		description: 'The user is typing a message',
+	},
+	{
+		name: 'Recording Video',
+		value: 'chatActionRecordingVideo',
+		description: 'The user is recording a video',
+	},
+	{
+		name: 'Uploading Document',
+		value: 'chatActionUploadingDocument',
+		description: 'The user is uploading a document',
+	},
+	{
+		name: 'Uploading Photo',
+		value: 'chatActionUploadingPhoto',
+		description: 'The user is uploading a photo',
+	},
+	{
+		name: 'Uploading Video',
+		value: 'chatActionUploadingVideo',
+		description: 'The user is uploading a video',
+	},
+	{
+		name: 'Uploading Video Note',
+		value: 'chatActionUploadingVideoNote',
+		description: 'The user is uploading a video note',
+	},
+	{
+		name: 'Uploading Voice Note',
+		value: 'chatActionUploadingVoiceNote',
+		description: 'The user is uploading a voice note',
+	},
+	{
+		name: 'Choosing Contact',
+		value: 'chatActionChoosingContact',
+		description: 'The user is picking a contact to send',
+	},
+	{
+		name: 'Choosing Location',
+		value: 'chatActionChoosingLocation',
+		description: 'The user is picking a location or venue to send',
+	},
+	{
+		name: 'Choosing Sticker',
+		value: 'chatActionChoosingSticker',
+		description: 'The user is picking a sticker to send',
+	},
+	{
+		name: 'Recording Video Note',
+		value: 'chatActionRecordingVideoNote',
+		description: 'The user is recording a video note',
+	},
+	{
+		name: 'Recording Voice Note',
+		value: 'chatActionRecordingVoiceNote',
+		description: 'The user is recording a voice note',
+	},
+	{
+		name: 'Starting Game',
+		value: 'chatActionStartPlayingGame',
+		description: 'The user has started to play a game',
+	},
+	{
+		name: 'Watching Animations',
+		value: 'chatActionWatchingAnimations',
+		description: 'The user is watching animations by clicking on an animated emoji',
+	},
+	{
+		name: 'Cancel Action',
+		value: 'chatActionCancel',
+		description: 'Cancel the previous action',
+	},
+];
+
 export class TelegramGramPro implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Telegram GramPro',
@@ -180,6 +258,12 @@ export class TelegramGramPro implements INodeType {
 						value: 'leaveChat',
 						action: 'Leave channel group',
 					},
+					{
+						name: 'Send Chat Action',
+						value: 'chatAction',
+						action: 'Send chat action',
+						description: 'Send action like is typing or uploading video',
+					},
 				],
 				default: 'getChat',
 			},
@@ -211,6 +295,21 @@ export class TelegramGramPro implements INodeType {
 					},
 				},
 				description: 'Whether to group chats by their Telegram folders (Dialog Filters)',
+			},
+			{
+				displayName: 'Action Type',
+				name: 'actionType',
+				type: 'options',
+				default: 'chatActionTyping',
+				displayOptions: {
+					show: {
+						resource: ['chat'],
+						operation: ['chatAction'],
+					},
+				},
+				options: chatActionTypes,
+				description:
+					'Send a chat action to indicate the user is doing something (e.g., typing, uploading media)',
 			},
 
 			// USER OPS
@@ -470,7 +569,7 @@ export class TelegramGramPro implements INodeType {
 							'leaveGroup',
 							'editMessageMedia',
 							'downloadMedia',
-							'readHistory',
+							'chatAction',
 						],
 					},
 					hide: {

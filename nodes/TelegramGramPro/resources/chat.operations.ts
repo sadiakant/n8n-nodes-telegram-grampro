@@ -7,6 +7,7 @@ import type { Dialog } from 'teleproto/tl/custom/dialog';
 
 import { cache, CacheKeys } from '../core/cache';
 import type { TelegramClientInstance, TelegramCredentials } from '../core/types';
+import { resolvePeer } from './message.operations';
 
 type SupportedDialogFilter = Api.DialogFilter | Api.DialogFilterChatlist;
 
@@ -154,6 +155,8 @@ export async function chatRouter(
 			return createChat.call(this, client, i);
 		case 'createChannel':
 			return createChannel.call(this, client, i);
+		case 'chatAction':
+			return chatAction.call(this, client, i);
 
 		default:
 			throw new Error(`Chat operation not supported: ${operation}`);
@@ -583,6 +586,78 @@ async function createChannel(
 				channelType: isPublic ? 'Public' : 'Private',
 				createTime: formattedDate,
 				inviteLink: inviteLink,
+			} as IDataObject,
+			pairedItem: { item: i },
+		},
+	];
+}
+
+
+
+async function chatAction(
+	this: IExecuteFunctions,
+	client: TelegramClientInstance,
+	i: number,
+): Promise<INodeExecutionData[]> {
+	const chatId = this.getNodeParameter('chatId', i) as string;
+	const actionType = this.getNodeParameter('actionType', i) as string;
+
+	const peer = await resolvePeer(client, chatId);
+
+	function buildAction(): Api.TypeSendMessageAction {
+		switch (actionType) {
+			case 'chatActionTyping':
+				return new Api.SendMessageTypingAction();
+			case 'chatActionRecordingVideo':
+				return new Api.SendMessageRecordVideoAction();
+			case 'chatActionUploadingVideo':
+				return new Api.SendMessageUploadVideoAction({ progress: 0 });
+			case 'chatActionRecordingVoiceNote':
+				return new Api.SendMessageRecordAudioAction();
+			case 'chatActionUploadingVoiceNote':
+				return new Api.SendMessageUploadAudioAction({ progress: 0 });
+			case 'chatActionUploadingPhoto':
+				return new Api.SendMessageUploadPhotoAction({ progress: 0 });
+			case 'chatActionUploadingDocument':
+				return new Api.SendMessageUploadDocumentAction({ progress: 0 });
+			case 'chatActionChoosingSticker':
+				return new Api.SendMessageChooseStickerAction();
+			case 'chatActionChoosingLocation':
+				return new Api.SendMessageGeoLocationAction();
+			case 'chatActionChoosingContact':
+				return new Api.SendMessageChooseContactAction();
+			case 'chatActionStartPlayingGame':
+				return new Api.SendMessageGamePlayAction();
+			case 'chatActionRecordingVideoNote':
+				return new Api.SendMessageRecordRoundAction();
+			case 'chatActionUploadingVideoNote':
+				return new Api.SendMessageUploadRoundAction({ progress: 0 });
+			case 'chatActionWatchingAnimations':
+				return new Api.SendMessageEmojiInteractionSeen({ emoticon: '👀' });
+			case 'chatActionCancel':
+				return new Api.SendMessageCancelAction();
+			default:
+				return new Api.SendMessageTypingAction();
+		}
+	}
+
+
+	await safeExecute(() =>
+		client.invoke(
+			new Api.messages.SetTyping({
+				peer: peer as never,
+				action: buildAction(),
+			}),
+		),
+	);
+
+	return [
+		{
+			json: {
+				success: true,
+				peer,
+				actionType,
+				message: `Chat action "${actionType}" sent successfully`,
 			} as IDataObject,
 			pairedItem: { item: i },
 		},
