@@ -140,6 +140,12 @@ export class TelegramGramPro implements INodeType {
 					{ name: 'Pin Message', value: 'pinMessage', action: 'Pin message' },
 					{ name: 'Send Message', value: 'sendText', action: 'Send message' },
 					{ name: 'Unpin Message', value: 'unpinMessage', action: 'Unpin message' },
+					{
+						name: 'Read Messages History',
+						value: 'readHistory',
+						action: 'Read messages',
+						description: 'Read/Seen messages in specific chat or channel',
+					},
 				],
 				default: 'sendText',
 			},
@@ -458,6 +464,7 @@ export class TelegramGramPro implements INodeType {
 							'leaveGroup',
 							'editMessageMedia',
 							'downloadMedia',
+							'readHistory',
 						],
 					},
 					hide: {
@@ -929,6 +936,7 @@ export class TelegramGramPro implements INodeType {
 							'forwardMessage',
 							'copyMessage',
 							'downloadMedia',
+							'readHistory',
 						],
 					},
 				},

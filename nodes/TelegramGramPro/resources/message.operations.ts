@@ -539,6 +539,8 @@ export async function messageRouter(
 			return editMessageMedia.call(this, client, i);
 		case 'copyRestrictedContent':
 			return copyRestrictedContent.call(this, client, i);
+		case 'readHistory':
+			return readHistory.call(this, client, i);
 		default:
 			throw new Error(`Message operation not supported: ${operation}`);
 	}
@@ -2104,6 +2106,50 @@ async function copyRestrictedContent(
 
 		throw asNodeOperationError(error, { context: this, itemIndex: i });
 	}
+}
+
+async function readHistory(
+	this: IExecuteFunctions,
+	client: TelegramClientInstance,
+	i: number,
+): Promise<INodeExecutionData[]> {
+	const chatId = this.getNodeParameter('chatId', i);
+	const messageId = Number(this.getNodeParameter('messageId', i));
+
+	// Resolve entity to detect peer kind
+	const entity = await getEntityLoose(client, chatId);
+	const peer = await resolvePeer(client, chatId);
+	const peerKind = detectPeerKind(entity, peer);
+
+	if (peerKind === 'channel') {
+		// For channels/supergroups
+		await client.invoke(
+			new Api.channels.ReadHistory({
+				channel: peer as never,
+				maxId: messageId,
+			}),
+		);
+	} else {
+		// For private chats and groups
+		await client.invoke(
+			new Api.messages.ReadHistory({
+				peer: chatId as never,
+				maxId: messageId,
+			}),
+		);
+	}
+
+	return [
+		{
+			json: {
+				success: true,
+				chatId,
+				messageId,
+				message: 'Message marked as read successfully',
+			},
+			pairedItem: { item: i },
+		},
+	];
 }
 
 // Helper function to download media with timeout
